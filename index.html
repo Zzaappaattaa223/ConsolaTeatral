@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <script>
+      // Fix: Prevent "Cannot set property fetch of #<Window> which has only a getter" when external tools/extensions try to overwrite fetch
+      (function() {
+        try {
+          var originalFetch = window.fetch;
+          var currentFetch = originalFetch;
+          Object.defineProperty(window, 'fetch', {
+            configurable: true,
+            enumerable: true,
+            get: function() {
+              return currentFetch;
+            },
+            set: function(value) {
+              currentFetch = value;
+            }
+          });
+        } catch (e) {
+          console.warn("Fallo al habilitar la redefinición de fetch:", e);
+        }
+      })();
+    </script>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23818cf8'%3E%3Cpath d='M5.25 3.75A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25z' /%3E%3Cpath d='M9 8.25a.75.75 0 000 1.5h6a.75.75 0 000-1.5H9zM9 12a.75.75 0 000 1.5h6a.75.75 0 000-1.5H9zM9 15.75a.75.75 0 000 1.5h6a.75.75 0 000-1.5H9z' /%3E%3C/svg%3E">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#111827">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Soundboard Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+             fontFamily: {
+                sans: ['Inter', 'sans-serif'],
+             },
+             animation: {
+                'fade-in': 'fadeIn 0.2s ease-out forwards',
+                'spin': 'spin 1s linear infinite',
+                'pulse-fade': 'pulse-fade 1.5s infinite',
+                'pastel-text': 'pastel-text 15s linear infinite',
+              },
+              keyframes: {
+                fadeIn: {
+                  '0%': { opacity: '0', transform: 'scale(0.95)' },
+                  '100%': { opacity: '1', transform: 'scale(1)' },
+                },
+                spin: {
+                  'from': { transform: 'rotate(0deg)' },
+                  'to': { transform: 'rotate(360deg)' },
+                },
+                'pulse-fade': {
+                    '0%, 100%': { opacity: '1' },
+                    '50%': { opacity: '0.7' },
+                },
+                 'pastel-text': {
+                    '0%': { color: '#ffb3ba' }, /* light pink */
+                    '25%': { color: '#baffc9' }, /* light green */
+                    '50%': { color: '#bae1ff' }, /* light blue */
+                    '75%': { color: '#ffffba' }, /* light yellow */
+                    '100%': { color: '#ffb3ba' }, /* back to light pink */
+                }
+              },
+          }
+        }
+      }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+        -webkit-tap-highlight-color: transparent;
+      }
+      .touch-manipulation {
+        touch-action: manipulation;
+      }
+      
+      /* Custom Webkit scrollbar for elegant header */
+      .header-scrollable {
+        scrollbar-width: thin;
+        scrollbar-color: #4b5563 #1f2937;
+      }
+      .header-scrollable::-webkit-scrollbar {
+        height: 4px;
+      }
+      .header-scrollable::-webkit-scrollbar-track {
+        background: #1f2937; /* gray-800 */
+        border-radius: 2px;
+      }
+      .header-scrollable::-webkit-scrollbar-thumb {
+        background: #4b5563; /* gray-600 */
+        border-radius: 2px;
+      }
+      .header-scrollable::-webkit-scrollbar-thumb:hover {
+        background: #6366f1; /* indigo-500 */
+      }
+      
+      .sound-pad-glow {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        box-shadow: 0 0 0px 0px rgba(79, 70, 229, 0);
+        transition: box-shadow 0.1s ease-out;
+        z-index: 0;
+      }
+      
+      .solo-active {
+        background-color: #facc15 !important; /* yellow-400 */
+        color: #1f2937 !important; /* gray-800 */
+      }
+      
+      .time-display {
+        font-family: 'Courier New', Courier, monospace;
+        pointer-events: none;
+      }
+      
+      .text-shadow-strong {
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6), 0 0 1px rgba(0, 0, 0, 0.8);
+      }
+
+       /* EQ Preamp Slider */
+      input[type=range].eq-preamp-slider {
+        -webkit-appearance: none;
+        appearance: none;
+        background: transparent;
+        cursor: pointer;
+        width: 100%;
+        height: 24px;
+      }
+      input[type=range].eq-preamp-slider::-webkit-slider-runnable-track {
+        background: #4b5563; /* gray-600 */
+        height: 4px;
+        border-radius: 2px;
+      }
+      input[type=range].eq-preamp-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        margin-top: -10px;
+        width: 24px;
+        height: 24px;
+        background-color: #f97316; /* orange-500 */
+        border-radius: 50%;
+        border: 3px solid #1f2937;
+        box-shadow: 0 0 5px rgba(0,0,0,0.5);
+      }
+      
+      /* New EQ Vertical Sliders */
+      input[type=range].eq-vertical-slider {
+        -webkit-appearance: slider-vertical;
+        appearance: none;
+        background: transparent;
+        cursor: pointer;
+        writing-mode: bt-lr;
+        width: 100%; 
+        height: 100%;
+        padding: 0;
+      }
+      input[type=range].eq-vertical-slider::-webkit-slider-runnable-track {
+        background: transparent;
+        width: 100%;
+        height: 100%;
+      }
+      input[type=range].eq-vertical-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 28px;
+        height: 16px;
+        background-color: #f97316;
+        border-radius: 4px;
+        border: 2px solid #1f2937;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      }
+       input[type=range].eq-vertical-slider::-moz-range-thumb {
+        width: 24px;
+        height: 14px;
+        background-color: #f97316;
+        border-radius: 4px;
+        border: 2px solid #1f2937;
+      }
+
+      /* New EQ Horizontal Slider for Mobile */
+      input[type=range].eq-horizontal-slider {
+          -webkit-appearance: none;
+          appearance: none;
+          background: transparent;
+          cursor: pointer;
+          width: 100%;
+          height: 28px; /* Thumb height */
+      }
+      input[type=range].eq-horizontal-slider::-webkit-slider-runnable-track {
+        background: transparent;
+        height: 100%;
+      }
+      input[type=range].eq-horizontal-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 16px;
+          height: 28px;
+          background-color: #f97316;
+          border-radius: 4px;
+          border: 2px solid #1f2937;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      }
+      input[type=range].eq-horizontal-slider::-moz-range-thumb {
+          width: 14px;
+          height: 24px;
+          background-color: #f97316;
+          border-radius: 4px;
+          border: 2px solid #1f2937;
+      }
+      
+       .spinner {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+       .truncate-multiline {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+        word-break: break-word;
+      }
+      
+      .grayscale-muted {
+        filter: grayscale(1);
+        opacity: 0.5;
+        transition: filter 0.3s ease, opacity 0.3s ease;
+      }
+      
+      input[type=range]:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      
+      input[type=range]:disabled::-webkit-slider-thumb {
+         background: #4b5563; /* gray-600 */
+      }
+
+      input[type=range]:disabled::-moz-range-thumb {
+         background: #4b5563;
+      }
+      
+      .pad-button-bg {
+        background-color: rgba(0,0,0,0.25);
+        border-radius: 9999px;
+      }
+      .time-display-bg {
+        background-color: rgba(0,0,0,0.25);
+        border-radius: 4px;
+        padding: 1px 4px;
+      }
+      .rotated-text-container {
+        transform: rotate(-90deg);
+      }
+      .scrubbable {
+        cursor: ew-resize;
+      }
+      .sound-pad-glow.flash {
+        animation: flashGlow 0.3s ease-out;
+      }
+      @keyframes flashGlow {
+        from { box-shadow: 0 0 25px 8px var(--glow-color, #facc15); opacity: 1; }
+        to   { box-shadow: 0 0 0px 0px var(--glow-color, #facc15); opacity: 0; }
+      }
+      
+      /* New Volume Fader on Pad */
+      input[type=range].pad-volume-fader {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 8px;
+        background: #4b5563; /* gray-600 */
+        border-radius: 4px;
+        outline: none;
+        transition: background .2s;
+      }
+      input[type=range].pad-volume-fader:hover {
+         background: #6b7280; /* gray-500 */
+      }
+      input[type=range].pad-volume-fader::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 28px;
+        height: 28px;
+        background: #818cf8; /* indigo-400 */
+        cursor: pointer;
+        border-radius: 50%;
+        border: 4px solid #1f2937;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      }
+      input[type=range].pad-volume-fader::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        background: #818cf8;
+        cursor: pointer;
+        border-radius: 50%;
+        border: 4px solid #1f2937;
+      }
+
+      /* Quick actions on Sound Pad */
+      .pad-action-group {
+          position: absolute;
+          top: 0.5rem; /* 8px */
+          right: 0.5rem; /* 8px */
+          z-index: 20;
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem; /* 4px */
+      }
+      .pad-action-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 36px;
+          height: 36px;
+          border-radius: 9999px;
+          background-color: rgba(0, 0, 0, 0.3);
+          color: #d1d5db; /* gray-300 */
+          transition: all 0.2s ease-in-out;
+          border: 1px solid transparent;
+      }
+      .pad-action-btn:hover:not(:disabled) {
+          background-color: rgba(0, 0, 0, 0.5);
+          color: white;
+      }
+      .pad-action-btn:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+      }
+      .pad-action-btn.active-loop {
+          background-color: #22c55e; /* green-500 */
+          color: white;
+          border-color: transparent;
+      }
+      .pad-action-btn.active-solo {
+          background-color: #facc15; /* yellow-400 */
+          color: #1f2937; /* gray-800 for contrast */
+          border-color: transparent;
+      }
+      .pad-action-btn.active-fade {
+          background-color: #3b82f6; /* blue-500 */
+          color: white;
+          border-color: transparent;
+          animation: pulse-fade 1.5s infinite;
+      }
+      
+      /* Global Transport Bar */
+      .global-transport-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem 1.5rem;
+        background-color: #1f2937; /* gray-800 */
+        border-bottom: 1px solid #374151; /* gray-700 */
+        flex-shrink: 0;
+      }
+      .transport-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .transport-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 0.375rem; /* rounded-md */
+        background-color: #374151; /* gray-700 */
+        transition: background-color 0.2s;
+      }
+      .transport-btn:hover:not(:disabled) {
+        background-color: #4b5563; /* gray-600 */
+      }
+      .transport-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .master-volume-container {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        width: 100%;
+        max-width: 320px;
+        flex-grow: 1;
+        justify-content: center;
+      }
+      input[type=range].master-fader-horizontal {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 8px;
+        background: #374151; /* gray-700 */
+        border-radius: 4px;
+        outline: none;
+        transition: background 0.2s;
+      }
+      input[type=range].master-fader-horizontal::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 28px;
+        height: 28px;
+        background: #6366f1; /* indigo-500 */
+        cursor: pointer;
+        border-radius: 50%;
+        border: 4px solid #1f2937; /* gray-800 */
+        box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      }
+      select.fade-select {
+        -webkit-appearance: none;
+        appearance: none;
+        background-color: #374151; /* gray-700 */
+        border: none;
+        padding: 0.5rem;
+        border-radius: 0.375rem;
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+      }
+    </style>
+</head>
+  <body class="bg-gray-900 text-white overflow-hidden">
+    <div id="root" class="font-sans"></div>
+    <script>
+      // Force unregister any active service worker to restore normal client loading
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (let registration of registrations) {
+            registration.unregister().then(() => {
+              console.log('ServiceWorker unregistered successfully');
+            });
+          }
+        });
+      }
+      // Force delete existing caches to remove raw cached tsx/ts files
+      if ('caches' in window) {
+        caches.keys().then((keys) => {
+          keys.forEach((key) => caches.delete(key));
+        });
+      }
+    </script>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
