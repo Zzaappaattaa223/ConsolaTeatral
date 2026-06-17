@@ -9,6 +9,7 @@ import ExportChoiceModal from './ExportChoiceModal';
 import ImportPreviewModal from './ImportPreviewModal';
 import { generateBasicProductionHTML } from './basicTemplate';
 import { generateProductionHTML } from './advancedTemplate';
+import { generateYoutubeProductionHTML } from './youtubeTemplate';
 
 const JSZip = (window as any).JSZip;
 
@@ -172,7 +173,7 @@ const Header = ({ onOpenCommandBar, onOpenSettings, isIdle }: { onOpenCommandBar
         });
     };
 
-    const startProductionExport = async (choice: 'basic' | 'advanced', format: 'html' | 'zip') => {
+    const startProductionExport = async (choice: 'basic' | 'advanced' | 'youtube', format: 'html' | 'zip') => {
         setExportChoiceModalOpen(false);
         const { soundboards, activeBoardId, masterVolume } = state;
         const activeBoard = soundboards.find(b => b.id === activeBoardId);
@@ -213,10 +214,12 @@ const Header = ({ onOpenCommandBar, onOpenSettings, isIdle }: { onOpenCommandBar
                 }
             }));
             
-            const isAdvanced = choice === 'advanced';
-            const productionHTML = isAdvanced 
-                ? generateProductionHTML(activeBoard, audioDataMap, masterVolume) 
-                : generateBasicProductionHTML(activeBoard, audioDataMap, masterVolume);
+            const productionHTML = choice === 'youtube'
+                ? generateYoutubeProductionHTML(activeBoard, audioDataMap, masterVolume)
+                : choice === 'advanced'
+                    ? generateProductionHTML(activeBoard, audioDataMap, masterVolume)
+                    : generateBasicProductionHTML(activeBoard, audioDataMap, masterVolume);
+
 
             const exportNumber = getNextExportNumber(activeBoard.id, 'html');
             const baseFileName = `Player_${activeBoard.name.replace(/[^a-z0-9]/gi, '_')}_v${exportNumber}`;
