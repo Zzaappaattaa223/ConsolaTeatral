@@ -1,5 +1,5 @@
 import { Soundboard } from '../types';
-import { soundGlowColors, EQ_BANDS } from '../constants';
+import { soundGlowColors } from '../constants';
 
 export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [key: string]: string }, masterVolume: number) => {
     const isNum = (val: any): val is number => typeof val === 'number' && isFinite(val);
@@ -242,14 +242,9 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
             flex-direction: column;
             background-color: transparent;
             position: relative;
-            cursor: pointer;
             border-radius: 12px;
             overflow: hidden;
             transition: transform 0.2s;
-        }
-
-        .sound-card:hover {
-            transform: scale(1.01);
         }
 
         /* Thumbnail Aspect Ratio 16:9 */
@@ -262,6 +257,7 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
             overflow: hidden;
             border: 2px solid transparent;
             transition: border-color 0.2s;
+            cursor: pointer;
         }
 
         .sound-card.is-playing .thumbnail-container {
@@ -317,7 +313,7 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
             transition: transform 0.2s;
         }
 
-        .sound-card:hover .play-btn-circle {
+        .thumbnail-container:hover .play-btn-circle {
             transform: scale(1.1);
         }
 
@@ -422,7 +418,7 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
         .description-text {
             display: -webkit-box;
             -webkit-box-orient: vertical;
-            -webkit-line-clamp: 1;
+            -webkit-line-clamp: 3;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: normal;
@@ -467,7 +463,7 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
             color: var(--yt-white);
             font-size: 0.75rem;
             font-weight: 600;
-            padding: 0 12px;
+            padding: 0 10px;
             height: 100%;
             cursor: pointer;
             display: flex;
@@ -817,6 +813,10 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
                 const playBtn = document.createElement('div');
                 playBtn.className = 'play-btn-circle';
                 playBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+                playBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    togglePlay(sound);
+                });
                 playOverlay.appendChild(playBtn);
                 thumbnailContainer.appendChild(playOverlay);
 
@@ -830,6 +830,25 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
                 progressBar.className = 'card-progress-bar';
                 progressBar.id = 'progress-' + sound.id;
                 thumbnailContainer.appendChild(progressBar);
+
+                // Double tap / click gesture on thumbnail to seek 5s (like YouTube mobile)
+                let lastTap = 0;
+                thumbnailContainer.addEventListener('click', (e) => {
+                    // Ignore if clicked directly on the play button
+                    if (e.target.closest('.play-btn-circle')) return;
+
+                    const now = Date.now();
+                    const DOUBLE_PRESS_DELAY = 300;
+                    if (now - lastTap < DOUBLE_PRESS_DELAY) {
+                        const rect = thumbnailContainer.getBoundingClientRect();
+                        const clickX = e.clientX - rect.left;
+                        const isRight = clickX > rect.width / 2;
+                        
+                        showDoubleTapRipple(sound.id, isRight);
+                        seekRelative(sound.id, isRight ? 5 : -5);
+                    }
+                    lastTap = now;
+                });
 
                 soundCard.appendChild(thumbnailContainer);
 
@@ -921,6 +940,38 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
 
                 actionsBar.appendChild(pillGroup);
 
+                // Time Navigation Group (Go to start, Go to end)
+                const navGroup = document.createElement('div');
+                navGroup.className = 'yt-pill-button-group';
+                
+                const startBtn = document.createElement('button');
+                startBtn.className = 'yt-action-btn';
+                startBtn.title = 'Ir al Inicio';
+                startBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:12px; height:12px;"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>';
+                startBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    seekTo(sound.id, sound.startTime || 0);
+                });
+                navGroup.appendChild(startBtn);
+
+                const dividerNav = document.createElement('div');
+                dividerNav.className = 'pill-divider';
+                navGroup.appendChild(dividerNav);
+
+                const endBtn = document.createElement('button');
+                endBtn.className = 'yt-action-btn';
+                endBtn.title = 'Ir al Final';
+                endBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width:12px; height:12px;"><path d="M6 18l8.5-6L6 6v12zM16 6h2v12h-2z"/></svg>';
+                endBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    getDecodedBuffer(sound.audioSourceId).then(buffer => {
+                        seekTo(sound.id, sound.endTime || buffer.duration);
+                    });
+                });
+                navGroup.appendChild(endBtn);
+                
+                actionsBar.appendChild(navGroup);
+
                 // Stop & Fade Group
                 const killGroup = document.createElement('div');
                 killGroup.className = 'yt-pill-button-group';
@@ -974,14 +1025,58 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
                 volumeGroup.appendChild(volSlider);
                 actionsBar.appendChild(volumeGroup);
 
+                // Pitch slider group
+                const pitchGroup = document.createElement('div');
+                pitchGroup.className = 'yt-volume-slider-group';
+                pitchGroup.title = 'Tono (Pitch)';
+                pitchGroup.innerHTML = '<span style="font-size: 0.65rem; font-weight: bold; color: var(--yt-gray-text); flex-shrink:0;">PITCH</span>';
+                
+                const pitchSlider = document.createElement('input');
+                pitchSlider.type = 'range';
+                pitchSlider.className = 'yt-slider';
+                pitchSlider.min = '0.5';
+                pitchSlider.max = '2.0';
+                pitchSlider.step = '0.05';
+                pitchSlider.value = sound.pitch || 1.0;
+                pitchSlider.addEventListener('input', (e) => {
+                    sound.pitch = parseFloat(e.target.value);
+                    const activeSource = activeSources[sound.id];
+                    if (activeSource && activeSource.source) {
+                        activeSource.source.playbackRate.value = sound.pitch;
+                    }
+                });
+                pitchSlider.addEventListener('click', e => e.stopPropagation());
+                pitchGroup.appendChild(pitchSlider);
+                actionsBar.appendChild(pitchGroup);
+
+                // Pan slider group
+                const panGroup = document.createElement('div');
+                panGroup.className = 'yt-volume-slider-group';
+                panGroup.title = 'Balance (Pan)';
+                panGroup.innerHTML = '<span style="font-size: 0.65rem; font-weight: bold; color: var(--yt-gray-text); flex-shrink:0;">PAN</span>';
+                
+                const panSlider = document.createElement('input');
+                panSlider.type = 'range';
+                panSlider.className = 'yt-slider';
+                panSlider.min = '-1';
+                panSlider.max = '1';
+                panSlider.step = '0.1';
+                panSlider.value = sound.pan || 0;
+                panSlider.addEventListener('input', (e) => {
+                    sound.pan = parseFloat(e.target.value);
+                    const activeSource = activeSources[sound.id];
+                    if (activeSource && activeSource.panner) {
+                        const context = getAudioContext();
+                        activeSource.panner.pan.setTargetAtTime(sound.pan, context.currentTime, 0.015);
+                    }
+                });
+                panSlider.addEventListener('click', e => e.stopPropagation());
+                panGroup.appendChild(panSlider);
+                actionsBar.appendChild(panGroup);
+
                 textContainer.appendChild(actionsBar);
                 cardDetails.appendChild(textContainer);
                 soundCard.appendChild(cardDetails);
-
-                // Play / Pause event
-                soundCard.addEventListener('click', () => {
-                    togglePlay(sound);
-                });
 
                 soundFeedEl.appendChild(soundCard);
 
@@ -1197,6 +1292,116 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
                     stopSound(soundId);
                 }, sound.fadeOut * 1000);
             }
+        }
+
+        function seekTo(soundId, newTime) {
+            const sound = BOARD_DATA.sounds.find(s => s.id === soundId);
+            if (!sound) return;
+            
+            getDecodedBuffer(sound.audioSourceId).then(buffer => {
+                const soundStartTime = sound.startTime || 0;
+                const soundEndTime = sound.endTime || buffer.duration;
+                const clamped = Math.max(soundStartTime, Math.min(newTime, soundEndTime));
+                
+                const activeSource = activeSources[soundId];
+                const wasPlaying = activeSource && activeSource.isPlaying;
+                
+                stopSound(soundId);
+                
+                if (wasPlaying) {
+                    playSound({
+                        ...sound,
+                        startTime: clamped
+                    });
+                } else {
+                    // Update progress UI
+                    const pct = (clamped / soundEndTime) * 100;
+                    const progressEl = document.getElementById('progress-' + soundId);
+                    if (progressEl) progressEl.style.width = pct + '%';
+                    
+                    const durationBadge = document.getElementById('duration-' + soundId);
+                    if (durationBadge) {
+                        const dur = soundEndTime - soundStartTime;
+                        durationBadge.innerText = formatTime(clamped) + ' / ' + formatTime(dur);
+                    }
+                    
+                    activeSources[soundId] = {
+                        isPlaying: false,
+                        offset: clamped,
+                        startTime: 0,
+                        duration: soundEndTime - soundStartTime
+                    };
+                    
+                    const card = document.getElementById('card-' + soundId);
+                    if (card) {
+                        card.classList.add('is-paused');
+                    }
+                }
+            });
+        }
+
+        function seekRelative(soundId, seconds) {
+            const activeSource = activeSources[soundId];
+            const sound = BOARD_DATA.sounds.find(s => s.id === soundId);
+            if (!sound) return;
+
+            getDecodedBuffer(sound.audioSourceId).then(buffer => {
+                const soundStartTime = sound.startTime || 0;
+                const soundEndTime = sound.endTime || buffer.duration;
+                
+                let currentOffset = soundStartTime;
+                if (activeSource) {
+                    currentOffset = activeSource.offset;
+                    if (activeSource.isPlaying) {
+                        currentOffset += (getAudioContext().currentTime - activeSource.startTime) * sound.pitch;
+                    }
+                }
+                
+                seekTo(soundId, currentOffset + seconds);
+            });
+        }
+
+        function showDoubleTapRipple(soundId, isRight) {
+            const card = document.getElementById('card-' + soundId);
+            if (!card) return;
+            const container = card.querySelector('.thumbnail-container');
+            if (!container) return;
+
+            const ripple = document.createElement('div');
+            ripple.className = 'double-tap-ripple';
+            ripple.style.position = 'absolute';
+            ripple.style.top = '0';
+            ripple.style.bottom = '0';
+            ripple.style.width = '50%';
+            ripple.style.background = 'rgba(255, 255, 255, 0.15)';
+            ripple.style.zIndex = '4';
+            ripple.style.display = 'flex';
+            ripple.style.flexDirection = 'column';
+            ripple.style.alignItems = 'center';
+            ripple.style.justifyContent = 'center';
+            ripple.style.pointerEvents = 'none';
+            ripple.style.opacity = '1';
+            ripple.style.transition = 'opacity 0.4s ease-out';
+            
+            if (isRight) {
+                ripple.style.right = '0';
+                ripple.style.borderRadius = '0 12px 12px 0';
+                ripple.innerHTML = '<span style="font-size: 1.5rem; font-weight: bold;">▶▶</span><span style="font-size: 0.75rem; font-weight: bold;">5s</span>';
+            } else {
+                ripple.style.left = '0';
+                ripple.style.borderRadius = '12px 0 0 12px';
+                ripple.innerHTML = '<span style="font-size: 1.5rem; font-weight: bold;">◀◀</span><span style="font-size: 0.75rem; font-weight: bold;">5s</span>';
+            }
+
+            container.appendChild(ripple);
+            
+            setTimeout(() => {
+                ripple.style.opacity = '0';
+            }, 50);
+            
+            setTimeout(() => {
+                ripple.remove();
+            }, 400);
         }
 
         function cleanupPlayback(soundId) {
