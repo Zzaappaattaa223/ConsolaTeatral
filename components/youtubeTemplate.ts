@@ -60,7 +60,7 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
-    <title>SoundTube: \${board.name}</title>
+    <title>SoundTube: ${board.name}</title>
     <style>
         :root {
             --yt-black: #0f0f0f;
@@ -695,7 +695,7 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
 
     <!-- Templates and Client JS -->
     <script>
-        \${clientSafeAtob}
+        ${clientSafeAtob}
         
         // Load soundboard config
         const BOARD_DATA = JSON.parse(safeAtob("${encodedBoard}"));
