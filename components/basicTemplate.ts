@@ -943,73 +943,69 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
                     if (isError) pad.classList.add("is-error");
 
                     // Archived badge overlay
-                    const archivedOverlay = sound.hidden ? `<div class="archived-badge"><span>Archivado</span></div>` : '';
+                    const archivedOverlay = sound.hidden ? '<div class="archived-badge"><span>Archivado</span></div>' : '';
 
                     // Operator instructions trigger (bulb icon)
-                    const instructionsButton = (sound.instructions && sound.instructions.trim().length > 0) ? `
-                        <div style="position: absolute; top: 6px; right: 6px; z-index: 35;">
-                            <button class="instruction-btn" title="Ver guía del operador">
-                                \${this.config.icons.bulb}
-                            </button>
-                            <div class="instruction-tooltip">\${sound.instructions}</div>
-                        </div>
-                    ` : '';
+                    const instructionsButton = (sound.instructions && sound.instructions.trim().length > 0) ? 
+                        '<div style="position: absolute; top: 6px; right: 6px; z-index: 35;">' +
+                            '<button class="instruction-btn" title="Ver guía del operador">' +
+                                this.config.icons.bulb +
+                            '</button>' +
+                            '<div class="instruction-tooltip">' + sound.instructions + '</div>' +
+                        '</div>' : '';
 
                     // Define what to render in time display / buttons row depending on size
-                    let loopButtonHtml = `<button class="loop-btn \${sound.loop ? 'is-active' : ''}" title="Toggle Loop">\${this.config.icons.loop}</button>`;
+                    let loopButtonHtml = '<button class="loop-btn ' + (sound.loop ? 'is-active' : '') + '" title="Toggle Loop">' + this.config.icons.loop + '</button>';
                     let quickBtnHtml = '';
                     if (isCompact) {
-                        quickBtnHtml = `
-                            <button class="loop-btn quick-controls-btn" style="background: rgba(99, 102, 241, 0.6); color: white; border-color: transparent; margin-left: 4px;" title="Controles">
-                                \${this.config.icons.sliders}
-                            </button>
-                        `;
+                        quickBtnHtml = 
+                            '<button class="loop-btn quick-controls-btn" style="background: rgba(99, 102, 241, 0.6); color: white; border-color: transparent; margin-left: 4px;" title="Controles">' +
+                                this.config.icons.sliders +
+                            '</button>';
                     }
 
                     let footerContent = '';
                     if (!isUltraCompact) {
-                        footerContent = `
-                            <div class="time-display" style="color: \${secondaryTextColor}">
-                                <span>00:00.0</span>
-                                \${loopButtonHtml}
-                                \${quickBtnHtml}
-                                <span>\${isError ? 'ERROR' : this.util.formatTime(duration)}</span>
-                            </div>
-                        `;
+                        footerContent = 
+                            '<div class="time-display" style="color: ' + secondaryTextColor + '">' +
+                                '<span>00:00.0</span>' +
+                                loopButtonHtml +
+                                quickBtnHtml +
+                                '<span>' + (isError ? 'ERROR' : this.util.formatTime(duration)) + '</span>' +
+                            '</div>';
                     } else {
                         // Ultra compact just shows play/pause and tiny controls/loop or time
-                        footerContent = `
-                            <div class="time-display" style="color: \${secondaryTextColor}; justify-content: center; gap: 6px;">
-                                \${loopButtonHtml}
-                                \${quickBtnHtml}
-                            </div>
-                        `;
+                        footerContent = 
+                            '<div class="time-display" style="color: ' + secondaryTextColor + '; justify-content: center; gap: 6px;">' +
+                                loopButtonHtml +
+                                quickBtnHtml +
+                            '</div>';
                     }
 
-                    pad.innerHTML = \`\${archivedOverlay}\${instructionsButton}
-                        <div class="rearrange-overlay">\${this.config.icons.move}</div><div class="progress-overlay"></div>
-                        <div class="play-indicator">
-                            <div class="play-arrow"></div>
-                            <div class="play-arrow"></div>
-                            <div class="play-arrow"></div>
-                        </div>
-                        <div class="pad-content">
-                            <h3 class="pad-name" title="\${sound.name}">\${sound.name}</h3>
-                            \${sound.stopActions && sound.stopActions.find(a => a.type === 'play') ? (function() {
+                    pad.innerHTML = archivedOverlay + instructionsButton +
+                        '<div class="rearrange-overlay">' + this.config.icons.move + '</div><div class="progress-overlay"></div>' +
+                        '<div class="play-indicator">' +
+                            '<div class="play-arrow"></div>' +
+                            '<div class="play-arrow"></div>' +
+                            '<div class="play-arrow"></div>' +
+                        '</div>' +
+                        '<div class="pad-content">' +
+                            '<h3 class="pad-name" title="' + sound.name + '">' + sound.name + '</h3>' +
+                            (sound.stopActions && sound.stopActions.find(a => a.type === 'play') ? (function() {
                                     const playNextAction = sound.stopActions.find(a => a.type === 'play');
                                     const nextSound = app.config.board.sounds.find(s => s.id === playNextAction.soundId);
-                                    return nextSound ? \`<div style="display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: bold; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 9999px; width: fit-content; color: #a5b4fc; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;" title="Al finalizar, reproduce automáticamente: \${nextSound.name}">
-                                        <span>🔗 Siguiente:</span>
-                                        <span style="overflow: hidden; text-overflow: ellipsis; max-width: 80px;">\${nextSound.name}</span>
-                                        <span>➡️</span>
-                                    </div>\` : '';
-                                })() : ''}
-                            <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center;"><button class="play-pause-btn" \${isError ? 'disabled' : ''}>\${isError ? this.config.icons.error : (playingNode && playingNode.status === 'playing' ? this.config.icons.pause : this.config.icons.play)}</button></div>
-                            <div class="pad-footer">
-                                \${footerContent}
-                            </div>
-                        </div>
-                        <div class="volume-slider-container"><input type="range" class="vertical-slider" min="0" max="1" step="0.01" value="\${sound.volume}"></div>\`;
+                                    return nextSound ? '<div style="display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: bold; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 9999px; width: fit-content; color: #a5b4fc; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;" title="Al finalizar, reproduce automáticamente: ' + nextSound.name + '">' +
+                                        '<span>🔗 Siguiente:</span>' +
+                                        '<span style="overflow: hidden; text-overflow: ellipsis; max-width: 80px;">' + nextSound.name + '</span>' +
+                                        '<span>➡️</span>' +
+                                    '</div>' : '';
+                                })() : '') +
+                            '<div style="flex-grow: 1; display: flex; align-items: center; justify-content: center;"><button class="play-pause-btn" ' + (isError ? 'disabled' : '') + '>' + (isError ? this.config.icons.error : (playingNode && playingNode.status === 'playing' ? this.config.icons.pause : this.config.icons.play)) + '</button></div>' +
+                            '<div class="pad-footer">' +
+                                footerContent +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="volume-slider-container"><input type="range" class="vertical-slider" min="0" max="1" step="0.01" value="' + sound.volume + '"></div>';
                     grid.appendChild(pad);
 
                     const playBtn = pad.querySelector('.play-pause-btn');
@@ -1091,7 +1087,7 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
                         const relativeCurrentTime = current - sound.startTime;
                         
                         currentTime.textContent = this.util.formatTime(relativeCurrentTime);
-                        progress.style.width = duration > 0 ? \`\${Math.min(100, (relativeCurrentTime / duration) * 100)}%\` : "0%";
+                        progress.style.width = duration > 0 ? \`\\\${Math.min(100, (relativeCurrentTime / duration) * 100)}%\` : "0%";
                     }
                 });
                 this.state.animationFrameId = requestAnimationFrame(() => this.updateUI());

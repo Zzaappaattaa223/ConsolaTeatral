@@ -1500,77 +1500,73 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                     if (isError) pad.classList.add("is-error");
 
                     // Archived badge overlay
-                    const archivedOverlay = sound.hidden ? `<div class="archived-badge"><span>Archivado</span></div>` : '';
+                    const archivedOverlay = sound.hidden ? '<div class="archived-badge"><span>Archivado</span></div>' : '';
 
                     // Operator instructions trigger (bulb icon)
-                    const instructionsButton = (sound.instructions && sound.instructions.trim().length > 0) ? `
-                        <div style="position: absolute; top: 6px; right: 6px; z-index: 35;">
-                            <button class="instruction-btn" title="Ver guía del operador">
-                                \${this.config.icons.bulb}
-                            </button>
-                            <div class="instruction-tooltip">\${sound.instructions}</div>
-                        </div>
-                    ` : '';
+                    const instructionsButton = (sound.instructions && sound.instructions.trim().length > 0) ? 
+                        '<div style="position: absolute; top: 6px; right: 6px; z-index: 35;">' +
+                            '<button class="instruction-btn" title="Ver guía del operador">' +
+                                this.config.icons.bulb +
+                            '</button>' +
+                            '<div class="instruction-tooltip">' + sound.instructions + '</div>' +
+                        '</div>' : '';
 
                     // Define what to render in actions row depending on size
                     let actionsRowContent = '';
                     if (!isUltraCompact) {
-                        actionsRowContent = `
-                            <button class="loop-btn \${sound.loop ? 'is-active' : ''}" title="\${sound.loop ? 'Loop On' : 'Loop Off'}">
-                                \${this.config.icons.loop}
-                            </button>
-                            <button class="pad-mini-btn solo-btn" title="Solo">S</button>
-                            <button class="pad-mini-btn fade-btn" title="Fade">\${this.config.icons.fadeOut}</button>
-                            <button class="pad-mini-btn stop-btn" title="Stop">\${this.config.icons.stop}</button>
-                        `;
+                        actionsRowContent = 
+                            '<button class="loop-btn ' + (sound.loop ? 'is-active' : '') + '" title="' + (sound.loop ? 'Loop On' : 'Loop Off') + '">' +
+                                this.config.icons.loop +
+                            '</button>' +
+                            '<button class="pad-mini-btn solo-btn" title="Solo">S</button>' +
+                            '<button class="pad-mini-btn fade-btn" title="Fade">' + this.config.icons.fadeOut + '</button>' +
+                            '<button class="pad-mini-btn stop-btn" title="Stop">' + this.config.icons.stop + '</button>';
                     } else {
-                        actionsRowContent = `
-                            <button class="pad-mini-btn stop-btn" style="background: rgba(0,0,0,0.6); padding: 4px; border-radius: 4px;" title="Stop">
-                                \${this.config.icons.stop}
-                            </button>
-                        `;
+                        actionsRowContent = 
+                            '<button class="pad-mini-btn stop-btn" style="background: rgba(0,0,0,0.6); padding: 4px; border-radius: 4px;" title="Stop">' +
+                                this.config.icons.stop +
+                            '</button>';
                     }
 
                     // If compact, add quick controls faders button in the actions row (or next to it)
                     if (isCompact) {
-                        actionsRowContent += `
-                            <button class="pad-mini-btn quick-controls-btn" style="background: rgba(99, 102, 241, 0.6); color: white; border-color: transparent;" title="Controles Rápidos">
-                                \${this.config.icons.sliders}
-                            </button>
-                        `;
+                        actionsRowContent += 
+                            '<button class="pad-mini-btn quick-controls-btn" style="background: rgba(99, 102, 241, 0.6); color: white; border-color: transparent;" title="Controles Rápidos">' +
+                                this.config.icons.sliders +
+                            '</button>';
                     }
 
-                    pad.innerHTML = \`\${archivedOverlay}\${instructionsButton}
-                        <div class="rearrange-overlay">\${this.config.icons.move}</div><div class="progress-overlay"></div><div class="sound-pad-glow"></div>
-                        <div class="play-indicator">
-                            <div class="play-arrow"></div>
-                            <div class="play-arrow"></div>
-                            <div class="play-arrow"></div>
-                        </div>
-                        <div class="pad-content">
-                            <div class="pad-title-box">
-                                <div class="pad-name" title="\${sound.name}">\${sound.name}</div>
-                                \${sound.stopActions && sound.stopActions.find(a => a.type === 'play') ? (function() {
+                    pad.innerHTML = archivedOverlay + instructionsButton +
+                        '<div class="rearrange-overlay">' + this.config.icons.move + '</div><div class="progress-overlay"></div><div class="sound-pad-glow"></div>' +
+                        '<div class="play-indicator">' +
+                            '<div class="play-arrow"></div>' +
+                            '<div class="play-arrow"></div>' +
+                            '<div class="play-arrow"></div>' +
+                        '</div>' +
+                        '<div class="pad-content">' +
+                            '<div class="pad-title-box">' +
+                                '<div class="pad-name" title="' + sound.name + '">' + sound.name + '</div>' +
+                                (sound.stopActions && sound.stopActions.find(a => a.type === 'play') ? (function() {
                                     const playNextAction = sound.stopActions.find(a => a.type === 'play');
                                     const nextSound = app.config.board.sounds.find(s => s.id === playNextAction.soundId);
                                     return nextSound ? '<div style="display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: bold; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 9999px; width: fit-content; color: #a5b4fc; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;" title="Al finalizar, reproduce automáticamente: ' + nextSound.name + '"><span>🔗 Siguiente:</span><span style="overflow: hidden; text-overflow: ellipsis; max-width: 80px;">' + nextSound.name + '</span><span>➡️</span></div>' : '';
-                                })() : ''}
-                            </div>
-                            <div class="pad-body"><div class="play-icon">\${playingNode && playingNode.status === 'playing' ? this.config.icons.pause : this.config.icons.play}</div></div>
-                            <div class="pad-footer">
-                                <div class="pad-actions-row">
-                                    \${actionsRowContent}
-                                </div>
-                                <div class="time-display">
-                                    <span>00:00.0</span>
-                                    <span>\${isError ? 'ERROR' : this.util.formatTime(duration)}</span>
-                                </div>
-                                <div class="play-counter">#\${sound.playCount || 0}</div>
-                            </div>
-                        </div>
-                        <div class="volume-slider-container">
-                            <input type="range" class="vertical-slider" min="0" max="1" step="0.01" value="\${sound.volume}" title="Volumen">
-                        </div>\`;
+                                })() : '') +
+                            '</div>' +
+                            '<div class="pad-body"><div class="play-icon">' + (playingNode && playingNode.status === 'playing' ? this.config.icons.pause : this.config.icons.play) + '</div></div>' +
+                            '<div class="pad-footer">' +
+                                '<div class="pad-actions-row">' +
+                                    actionsRowContent +
+                                '</div>' +
+                                '<div class="time-display">' +
+                                    '<span>00:00.0</span>' +
+                                    '<span>' + (isError ? 'ERROR' : this.util.formatTime(duration)) + '</span>' +
+                                '</div>' +
+                                '<div class="play-counter">#' + (sound.playCount || 0) + '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="volume-slider-container">' +
+                            '<input type="range" class="vertical-slider" min="0" max="1" step="0.01" value="' + sound.volume + '" title="Volumen">' +
+                        '</div>';
                     grid.appendChild(pad);
 
                     const playIcon = pad.querySelector('.play-icon');
@@ -1664,7 +1660,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                         const relativeCurrentTime = current - sound.startTime;
                         
                         if (currentTime) currentTime.textContent = this.util.formatTime(relativeCurrentTime);
-                        if (progress) progress.style.width = duration > 0 ? `\${Math.min(100, (relativeCurrentTime / duration) * 100)}%` : "0%";
+                        if (progress) progress.style.width = duration > 0 ? \`\\\${Math.min(100, (relativeCurrentTime / duration) * 100)}%\` : "0%";
                         
                         if (node.analyser && glow) {
                             const data = new Uint8Array(node.analyser.frequencyBinCount);
@@ -1672,7 +1668,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                             let sumSq = 0; data.forEach(v => { const val = v / 128 - 1; sumSq += val * val });
                             const rms = Math.sqrt(sumSq / data.length);
                             const glowAmount = Math.min(8 + (rms * 70), 35);
-                            glow.style.boxShadow = `0 0 \${glowAmount}px \${glowAmount/3}px \${this.config.colors[sound.color] || "#ffffff"}`;
+                            glow.style.boxShadow = \`0 0 \\\${glowAmount}px \\\${glowAmount/3}px \\\${this.config.colors[sound.color] || "#ffffff"}\`;
                         }
                     }
                     
