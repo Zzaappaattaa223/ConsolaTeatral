@@ -1025,7 +1025,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                 this.initGlobalActions();
                 this.eq.init();
                 
-                // Immediately render UI in its initial state so the page appears instantly responsive
+                /* Immediately render UI in its initial state so the page appears instantly responsive */
                 try {
                     this.render();
                     this.initDragAndDrop();
@@ -1034,7 +1034,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                     console.error("Initial render error:", e);
                 }
 
-                // Hide loading overlay transitionally as soon as we finish loading, or up to a maximum timeout
+                /* Hide loading overlay transitionally as soon as we finish loading, or up to a maximum timeout */
                 let completed = false;
                 const hideLoading = () => {
                     if (completed) return;
@@ -1047,10 +1047,10 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                     }
                 };
 
-                // Triggers async preload of audio in background, which handles decoding gracefully
+                /* Triggers async preload of audio in background, which handles decoding gracefully */
                 this.preloadAudio().then(() => {
                     try {
-                        this.render(); // Re-render once audios decode to show correct durations
+                        this.render(); /* Re-render once audios decode to show correct durations */
                     } catch(e) {}
                     hideLoading();
                 }).catch(err => {
@@ -1058,7 +1058,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                     hideLoading();
                 });
 
-                // Fail-safe path: force hide overlay after 1.5s if browser background decode stalls
+                /* Fail-safe path: force hide overlay after 1.5s if browser background decode stalls */
                 setTimeout(hideLoading, 1500);
             },
             initUI() {
@@ -1067,7 +1067,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                 if(slider) {
                     slider.addEventListener('input', (e) => {
                         root.style.setProperty('--col-width', e.target.value + 'px');
-                        this.render(); // Re-render to update compact/ultra-compact layout states in real time
+                        this.render(); /* Re-render to update compact/ultra-compact layout states in real time */
                     });
                 }
                 
@@ -1087,7 +1087,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                     });
                 }
 
-                // Close button and backdrop click for quick controls modal
+                /* Close button and backdrop click for quick controls modal */
                 const quickModal = document.getElementById('quick-controls-modal');
                 document.getElementById('quick-close-btn').addEventListener('click', () => {
                     quickModal.classList.remove('visible');
@@ -1100,7 +1100,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                     }
                 });
 
-                // Slider input listeners in the quick controls modal
+                /* Slider input listeners in the quick controls modal */
                 const quickVolSlider = document.getElementById('quick-vol-slider');
                 const quickVolVal = document.getElementById('quick-vol-val');
                 quickVolSlider.addEventListener('input', (e) => {
@@ -1115,7 +1115,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                     const node = this.state.playingNodes[soundId];
                     if (node && node.fadeState !== 'out') node.gainNode.gain.setTargetAtTime(val, this.state.audioContext.currentTime, 0.01);
                     
-                    // Update main fader visually if it exists in DOM
+                    /* Update main fader visually if it exists in DOM */
                     const cache = this.state.domCache[soundId];
                     if (cache && cache.volumeSlider) cache.volumeSlider.value = val;
                 });
@@ -1150,7 +1150,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                     if (node && node.panner) node.panner.pan.setTargetAtTime(val, this.state.audioContext.currentTime, 0.015);
                 });
 
-                // Quick modal transport controls
+                /* Quick modal transport controls */
                 document.getElementById('quick-play-btn').addEventListener('click', () => {
                     const soundId = this.state.activeQuickSoundId;
                     if (!soundId) return;
@@ -1168,7 +1168,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                     this.audio.stop(soundId, 0.05);
                 });
 
-                // Close tooltips when clicking outside
+                /* Close tooltips when clicking outside */
                 document.addEventListener('click', (e) => {
                     if (!e.target.closest('.instruction-btn') && !e.target.closest('.instruction-tooltip')) {
                         document.querySelectorAll('.instruction-tooltip').forEach(el => el.classList.remove('visible'));
@@ -1190,31 +1190,31 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
 
                 title.textContent = sound.name;
                 
-                // Volume
+                /* Volume */
                 const playingNode = this.state.playingNodes[sound.id];
                 const currentVol = (playingNode && playingNode.gainNode) ? playingNode.gainNode.gain.value : sound.volume;
                 volSlider.value = currentVol;
                 volVal.textContent = Math.round(currentVol * 100) + '%';
                 
-                // Pitch
+                /* Pitch */
                 pitchSlider.value = sound.pitch ?? 1.0;
                 pitchVal.textContent = (sound.pitch ?? 1.0).toFixed(2) + 'x';
                 
-                // Pan
+                /* Pan */
                 panSlider.value = sound.pan ?? 0;
                 panVal.textContent = (sound.pan ?? 0).toFixed(2);
                 
-                // Instructions
+                /* Instructions */
                 instructions.textContent = sound.instructions || 'Sin indicaciones cargadas para esta ficha.';
 
-                // Color themes matching pad
+                /* Color themes matching pad */
                 const colorStyle = this.config.colorStyles[sound.color];
                 if (contentDiv) {
                     contentDiv.style.background = colorStyle ? colorStyle.background : 'rgba(31, 41, 55, 0.75)';
                     contentDiv.style.borderColor = this.config.colors[sound.color] || '#6366f1';
                 }
 
-                // Update transport buttons states in modal
+                /* Update transport buttons states in modal */
                 this.updateQuickTransportUI(sound.id);
 
                 modal.classList.add('visible');
@@ -1263,7 +1263,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                 const grid = document.getElementById("sound-grid");
                 let draggedItem = null;
 
-                // --- MOUSE EVENTS ---
+                /* --- MOUSE EVENTS --- */
                 grid.addEventListener('dragstart', (e) => {
                     if (!this.state.isRearrangeMode) { e.preventDefault(); return; }
                     draggedItem = e.target.closest('.sound-pad');
@@ -1294,7 +1294,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                     }
                 });
 
-                // --- TOUCH EVENTS ---
+                /* --- TOUCH EVENTS --- */
                 const handleTouchStart = (e) => {
                     if (!this.state.isRearrangeMode) return;
                     
@@ -1361,7 +1361,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
             },
             async generateImpulseBuffer(ctx) {
                  const rate = ctx.sampleRate;
-                 const length = rate * 2; // 2 seconds
+                 const length = rate * 2; /* 2 seconds */
                  const decay = 2.0;
                  const buffer = ctx.createBuffer(2, length, rate);
                  for (let c = 0; c < 2; c++) {
@@ -1427,7 +1427,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                                 } catch(e) { reject(e); }
                             });
                         } else {
-                            // Decode base64 using safe atob (works reliably for large files without URL length limits)
+                            /* Decode base64 using safe atob (works reliably for large files without URL length limits) */
                             const sanitizedBase64 = cleanBase64.replace(/[^A-Za-z0-9+/=]/g, '');
                             const bin = atob(sanitizedBase64);
                             const bytes = new Uint8Array(bin.length);
@@ -1466,7 +1466,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
 
                 this.config.board.sounds.forEach(sound => {
                     if (sound.hidden && !this.state.showHiddenSounds) {
-                        return; // Skip hidden sounds
+                        return; /* Skip hidden sounds */
                     }
 
                     const isError = this.state.audioBuffers[sound.audioSourceId] === "error";
@@ -1480,13 +1480,13 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                     if (isCompact) pad.className += " is-compact";
                     if (isUltraCompact) pad.className += " is-ultra-compact";
                     
-                    // Restore playing state class if active
+                    /* Restore playing state class if active */
                     const playingNode = this.state.playingNodes[sound.id];
                     if (playingNode) {
                         pad.classList.add(playingNode.status === 'playing' ? 'is-playing' : 'is-paused');
                     }
 
-                    // Enable standard HTML5 drag
+                    /* Enable standard HTML5 drag */
                     pad.setAttribute('draggable', 'true'); 
 
                     const colorStyle = this.config.colorStyles[sound.color];
@@ -1499,10 +1499,10 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
 
                     if (isError) pad.classList.add("is-error");
 
-                    // Archived badge overlay
+                    /* Archived badge overlay */
                     const archivedOverlay = sound.hidden ? '<div class="archived-badge"><span>Archivado</span></div>' : '';
 
-                    // Operator instructions trigger (bulb icon)
+                    /* Operator instructions trigger (bulb icon) */
                     const instructionsButton = (sound.instructions && sound.instructions.trim().length > 0) ? 
                         '<div style="position: absolute; top: 6px; right: 6px; z-index: 35;">' +
                             '<button class="instruction-btn" title="Ver guía del operador">' +
@@ -1511,7 +1511,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                             '<div class="instruction-tooltip">' + sound.instructions + '</div>' +
                         '</div>' : '';
 
-                    // Define what to render in actions row depending on size
+                    /* Define what to render in actions row depending on size */
                     let actionsRowContent = '';
                     if (!isUltraCompact) {
                         actionsRowContent = 
@@ -1528,7 +1528,7 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                             '</button>';
                     }
 
-                    // If compact, add quick controls faders button in the actions row (or next to it)
+                    /* If compact, add quick controls faders button in the actions row (or next to it) */
                     if (isCompact) {
                         actionsRowContent += 
                             '<button class="pad-mini-btn quick-controls-btn" style="background: rgba(99, 102, 241, 0.6); color: white; border-color: transparent;" title="Controles Rápidos">' +

@@ -54,24 +54,56 @@ export class AudioDB {
   }
 
   async get(key: string): Promise<Blob | null> {
-    const db = await this.getDB();
-    const tx = db.transaction(this.storeName, 'readonly');
-    const request = tx.objectStore(this.storeName).get(key);
-    return new Promise(r => request.onsuccess = () => r(request.result || null));
+    try {
+      const db = await this.getDB();
+      const tx = db.transaction(this.storeName, 'readonly');
+      const store = tx.objectStore(this.storeName);
+      const request = store.get(key);
+      return new Promise((resolve) => {
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => {
+          console.error(`IndexedDB read error for key ${key}:`, request.error);
+          resolve(null);
+        };
+        tx.onerror = () => {
+          console.error(`IndexedDB transaction error for key ${key}:`, tx.error);
+          resolve(null);
+        };
+      });
+    } catch (e) {
+      console.error(`IndexedDB get failure for key ${key}:`, e);
+      return null;
+    }
   }
   
   async delete(key: string): Promise<void> {
-    const db = await this.getDB();
-    const tx = db.transaction(this.storeName, 'readwrite');
-    tx.objectStore(this.storeName).delete(key);
-    return new Promise(r => tx.oncomplete = () => r());
+    try {
+      const db = await this.getDB();
+      const tx = db.transaction(this.storeName, 'readwrite');
+      tx.objectStore(this.storeName).delete(key);
+      return new Promise((resolve) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+        tx.onabort = () => resolve();
+      });
+    } catch (e) {
+      console.error(`IndexedDB delete error for key ${key}:`, e);
+    }
   }
 
   async clear(): Promise<void> {
-    const db = await this.getDB();
-    const tx = db.transaction(this.storeName, 'readwrite');
-    tx.objectStore(this.storeName).clear();
-    return new Promise(r => tx.oncomplete = () => r());
+    try {
+      const db = await this.getDB();
+      const tx = db.transaction(this.storeName, 'readwrite');
+      tx.objectStore(this.storeName).clear();
+      return new Promise((resolve) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+        tx.onabort = () => resolve();
+      });
+    } catch (e) {
+      console.error("IndexedDB clear error:", e);
+    }
   }
 }
 

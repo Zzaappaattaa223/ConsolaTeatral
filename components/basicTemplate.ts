@@ -667,7 +667,7 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
                 this.initMasterVolume();
                 this.initGlobalActions();
                 
-                // Immediately render UI in its initial state so the page appears instantly responsive
+                /* Immediately render UI in its initial state so the page appears instantly responsive */
                 try {
                     this.render();
                     this.initDragAndDrop();
@@ -676,7 +676,7 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
                     console.error("Initial render error:", e);
                 }
 
-                // Hide loading overlay transitionally as soon as we finish loading, or up to a maximum timeout
+                /* Hide loading overlay transitionally as soon as we finish loading, or up to a maximum timeout */
                 let completed = false;
                 const hideLoading = () => {
                     if (completed) return;
@@ -689,10 +689,10 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
                     }
                 };
 
-                // Triggers async preload of audio in background, which handles decoding gracefully
+                /* Triggers async preload of audio in background, which handles decoding gracefully */
                 this.preloadAudio().then(() => {
                     try {
-                        this.render(); // Re-render once audios decode to show correct durations
+                        this.render(); /* Re-render once audios decode to show correct durations */
                     } catch(e) {}
                     hideLoading();
                 }).catch(err => {
@@ -700,7 +700,7 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
                     hideLoading();
                 });
 
-                // Fail-safe path: force hide overlay after 1.5s if browser background decode stalls
+                /* Fail-safe path: force hide overlay after 1.5s if browser background decode stalls */
                 setTimeout(hideLoading, 1500);
             },
             initUI() {
@@ -723,7 +723,7 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
                 const grid = document.getElementById("sound-grid");
                 let draggedItem = null;
 
-                // --- MOUSE EVENTS ---
+                /* --- MOUSE EVENTS --- */
                 grid.addEventListener('dragstart', (e) => {
                     if (!this.state.isRearrangeMode) { e.preventDefault(); return; }
                     draggedItem = e.target.closest('.sound-pad');
@@ -739,7 +739,7 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
                 });
 
                 grid.addEventListener('dragover', (e) => {
-                    e.preventDefault(); // Necessary to allow dropping
+                    e.preventDefault(); /* Necessary to allow dropping */
                     const target = e.target.closest('.sound-pad');
                     if (target && target !== draggedItem && draggedItem && this.state.isRearrangeMode) {
                         const children = Array.from(grid.children);
@@ -754,14 +754,14 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
                     }
                 });
 
-                // --- TOUCH EVENTS ---
+                /* --- TOUCH EVENTS --- */
                 const handleTouchStart = (e) => {
                     if (!this.state.isRearrangeMode) return;
                     
                     const pad = e.target.closest('.sound-pad');
                     if(!pad) return;
                     
-                    // No delay for rearrange mode touch drag
+                    /* No delay for rearrange mode touch drag */
                     draggedItem = pad;
                     pad.classList.add('is-dragging');
                     if(navigator.vibrate) navigator.vibrate(50);
@@ -769,7 +769,7 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
 
                 const handleTouchMove = (e) => {
                     if (!draggedItem || !this.state.isRearrangeMode) return;
-                    e.preventDefault(); // Prevent scroll while dragging
+                    e.preventDefault(); /* Prevent scroll while dragging */
                     
                     const touch = e.touches[0];
                     const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.sound-pad');
@@ -859,7 +859,7 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
                         const cleanBase64 = base64.includes(',') ? base64.split(',')[1] : base64;
                         let buffer;
                         if (base64.startsWith('./')) {
-                            // Fetch from file path
+                            /* Fetch from file path */
                             const response = await fetch(base64);
                             if (!response.ok) throw new Error("No se pudo cargar el archivo: " + base64);
                             const arrayBuffer = await response.arrayBuffer();
@@ -871,7 +871,7 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
                                 } catch(e) { reject(e); }
                             });
                         } else {
-                            // Decode base64 using safe atob (works reliably for large files without URL length limits)
+                            /* Decode base64 using safe atob (works reliably for large files without URL length limits) */
                             const sanitizedBase64 = cleanBase64.replace(/[^A-Za-z0-9+/=]/g, '');
                             const bin = atob(sanitizedBase64);
                             const bytes = new Uint8Array(bin.length);
@@ -909,7 +909,7 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
 
                 this.config.board.sounds.forEach(sound => {
                     if (sound.hidden && !this.state.showHiddenSounds) {
-                        return; // Skip hidden sounds
+                        return; /* Skip hidden sounds */
                     }
 
                     const isError = this.state.audioBuffers[sound.audioSourceId] === "error";
@@ -923,7 +923,7 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
                     if (isCompact) pad.className += " is-compact";
                     if (isUltraCompact) pad.className += " is-ultra-compact";
                     
-                    // Restore playing class if active
+                    /* Restore playing class if active */
                     const playingNode = this.state.playingNodes[sound.id];
                     if (playingNode) {
                         pad.classList.add(playingNode.status === 'playing' ? 'is-playing' : 'is-paused');
@@ -942,10 +942,10 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
 
                     if (isError) pad.classList.add("is-error");
 
-                    // Archived badge overlay
+                    /* Archived badge overlay */
                     const archivedOverlay = sound.hidden ? '<div class="archived-badge"><span>Archivado</span></div>' : '';
 
-                    // Operator instructions trigger (bulb icon)
+                    /* Operator instructions trigger (bulb icon) */
                     const instructionsButton = (sound.instructions && sound.instructions.trim().length > 0) ? 
                         '<div style="position: absolute; top: 6px; right: 6px; z-index: 35;">' +
                             '<button class="instruction-btn" title="Ver guía del operador">' +
@@ -954,7 +954,7 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
                             '<div class="instruction-tooltip">' + sound.instructions + '</div>' +
                         '</div>' : '';
 
-                    // Define what to render in time display / buttons row depending on size
+                    /* Define what to render in time display / buttons row depending on size */
                     let loopButtonHtml = '<button class="loop-btn ' + (sound.loop ? 'is-active' : '') + '" title="Toggle Loop">' + this.config.icons.loop + '</button>';
                     let quickBtnHtml = '';
                     if (isCompact) {
@@ -974,7 +974,7 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
                                 '<span>' + (isError ? 'ERROR' : this.util.formatTime(duration)) + '</span>' +
                             '</div>';
                     } else {
-                        // Ultra compact just shows play/pause and tiny controls/loop or time
+                        /* Ultra compact just shows play/pause and tiny controls/loop or time */
                         footerContent = 
                             '<div class="time-display" style="color: ' + secondaryTextColor + '; justify-content: center; gap: 6px;">' +
                                 loopButtonHtml +
@@ -1172,7 +1172,7 @@ export const generateBasicProductionHTML = (board: Soundboard, audioData: { [key
                         if (app.state.playingNodes[sound.id]?.source === source && !sound.loop) {
                             app.audio.stop(sound.id); 
                             
-                            // Trigger play on finish automation
+                            /* Trigger play on finish automation */
                             if (sound.stopActions && sound.stopActions.length > 0) {
                                 sound.stopActions.forEach(action => {
                                     if (action.type === 'play') {

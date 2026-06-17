@@ -608,6 +608,7 @@ export const AppProvider = ({ children }: { children?: React.ReactNode }) => {
                     const restoredState: AppState = {
                         ...initialState,
                         ...savedState,
+                        editMode: false,
                         isLoading: false,
                         audioSources: {},
                         imageSources: {},
@@ -615,7 +616,6 @@ export const AppProvider = ({ children }: { children?: React.ReactNode }) => {
                         trash: [], 
                         isRearrangeMode: false,
                     };
-                    
                     if (restoredState.activeBoardId && !restoredState.soundboards.find(b => b.id === restoredState.activeBoardId)) {
                          restoredState.activeBoardId = restoredState.soundboards.length > 0 ? restoredState.soundboards[0].id : null;
                     }
