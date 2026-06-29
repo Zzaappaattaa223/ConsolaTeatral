@@ -258,7 +258,16 @@ const Header = ({ onOpenCommandBar, onOpenSettings, isIdle }: { onOpenCommandBar
     return (
         <header className={`bg-gray-800 text-white shadow-md z-20 flex-shrink-0 transition-all duration-300 ease-in-out ${isExpanded ? 'p-3' : 'py-1 px-3'}`}>
             <div className="flex justify-between items-center">
-                <div className={`min-w-0 flex-1 md:flex-initial transition-all duration-500 ease-in-out mr-2 ${!isExpanded ? 'flex-1' : ''}`}>
+                <div className={`min-w-0 flex-1 md:flex-initial transition-all duration-500 ease-in-out mr-2 flex items-center gap-2 ${!isExpanded ? 'flex-1' : ''}`}>
+                    <button
+                        onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
+                        className="p-1.5 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white rounded-lg transition-colors cursor-pointer border border-gray-600 md:hidden flex-shrink-0"
+                        title="Ver Pistas de Sonido"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
                     <h1 className={`text-[15px] sm:text-lg md:text-xl font-bold truncate ${!isExpanded ? 'text-center' : 'text-left'} ${!isExpanded && isIdle ? 'animate-pastel-text' : ''}`}>
                         Consola de Sonido - Teatro de la Abadía 2025
                     </h1>

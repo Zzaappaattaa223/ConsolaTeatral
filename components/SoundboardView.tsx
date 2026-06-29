@@ -17,7 +17,19 @@ const SoundboardView = ({ board, onPlay, onPause, onStop, onFadeOut, onEdit, onA
 }) => {
     const { state } = useAppContext();
     const { playbackStates, soloSoundId, padSize, isRearrangeMode } = state;
-    const actualPadSize = padSize || 224; // Fallback to avoid invalid CSS values
+    
+    const [isMobile, setIsMobile] = React.useState(false);
+    React.useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 640);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    const actualPadSize = isMobile ? 140 : (padSize || 224);
+    const minColWidth = isMobile ? 130 : Math.max(160, actualPadSize * 0.8);
     
     const dragItem = useRef<number | null>(null);
 
@@ -48,7 +60,7 @@ const SoundboardView = ({ board, onPlay, onPause, onStop, onFadeOut, onEdit, onA
             <div
                 className="grid gap-4"
                 style={{
-                    gridTemplateColumns: `repeat(auto-fill, minmax(${Math.max(160, actualPadSize * 0.8)}px, 1fr))`,
+                    gridTemplateColumns: `repeat(auto-fill, minmax(${minColWidth}px, 1fr))`,
                     gridAutoRows: `${actualPadSize}px`
                 }}
             >

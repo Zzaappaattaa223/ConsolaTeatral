@@ -94,7 +94,14 @@ const SoundboardList = ({ onReorderBoards }: { onReorderBoards: (sourceIndex: nu
 
     return (
         <>
-            <aside className={`bg-gray-800 flex flex-col h-full flex-shrink-0 relative transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-14' : 'w-64 p-4'}`}>
+            {/* Backdrop wrapper on mobile */}
+            {!isSidebarCollapsed && (
+                <div 
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden transition-opacity duration-300"
+                    onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
+                />
+            )}
+            <aside className={`bg-gray-800 flex flex-col h-full flex-shrink-0 transition-all duration-300 ease-in-out z-40 ${isSidebarCollapsed ? 'w-0 overflow-hidden md:w-14 md:overflow-visible' : 'fixed md:relative inset-y-0 left-0 w-64 p-4 shadow-2xl md:shadow-none'}`}>
              <button
                 onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
                 className="absolute top-3 right-3 p-1 rounded-full hover:bg-gray-600 text-gray-300 z-10"

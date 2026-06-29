@@ -639,6 +639,71 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
         .sound-card.is-dimmed {
             opacity: 0.45;
         }
+
+        /* Selection styling */
+        .sound-card.is-selected .thumbnail-container {
+            border-color: #1a73e8;
+            box-shadow: 0 0 12px rgba(26, 115, 232, 0.6);
+        }
+
+        /* Selected timeline panel styling */
+        .selected-timeline-panel {
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* Card controls panel styling */
+        .card-controls-panel {
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* Description editing area styling */
+        .description-edit-area {
+            width: 100%;
+            height: 70px;
+            background-color: #121212;
+            border: 1px solid var(--yt-light-gray);
+            color: var(--yt-white);
+            font-size: 0.8rem;
+            border-radius: 4px;
+            padding: 6px;
+            margin-top: 6px;
+            resize: vertical;
+            outline: none;
+        }
+        
+        .description-edit-area:focus {
+            border-color: var(--theme-color, var(--yt-red));
+        }
+
+        .desc-edit-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .desc-btn {
+            background-color: var(--yt-chip-bg);
+            border: none;
+            color: white;
+            font-size: 0.7rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .desc-btn:hover {
+            background-color: var(--yt-chip-bg-hover);
+        }
+
+        .desc-btn-save {
+            background-color: var(--theme-color, var(--yt-red));
+        }
+        
+        .desc-btn-save:hover {
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body>
@@ -660,6 +725,10 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
         </div>
 
         <div class="header-right">
+            <button id="download-updated-btn" class="yt-footer-btn" style="background-color: var(--yt-chip-bg); height: 32px; border-radius: 16px; font-size: 0.75rem;" title="Descargar Copia Modificada">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                <span>Descargar Copia</span>
+            </button>
             <div style="font-size: 0.8rem; font-weight: 600; color: var(--yt-gray-text); display: none;" id="status-label">Offline Ready</div>
         </div>
     </header>
@@ -694,10 +763,23 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
         ${clientSafeAtob}
         
         // Load soundboard config
-        const BOARD_DATA = JSON.parse(safeAtob("${encodedBoard}"));
-        const AUDIO_DATA_MAP = {
-            ${Object.entries(audioDataBase64).map(([id, base64]) => `"${id}": "${base64}"`).join(',\n            ')}
+        const APP_DATA = {
+            board: JSON.parse(safeAtob("${encodedBoard}")),
+            audioData: {
+                ${Object.entries(audioDataBase64).map(([id, base64]) => `"${id}": "${base64}"`).join(',\n                ')}
+            },
+            initialMasterVolume: ${masterVolume}
         };
+        const BOARD_DATA = APP_DATA.board;
+        const AUDIO_DATA_MAP = APP_DATA.audioData;
+
+        // Restore instruction edits from localStorage
+        BOARD_DATA.sounds.forEach(sound => {
+            const stored = localStorage.getItem('yt-sound-instructions-' + BOARD_DATA.id + '-' + sound.id);
+            if (stored !== null) {
+                sound.instructions = stored;
+            }
+        });
 
         const soundColorsGlow = {
             chakraRed: '#ff0000',
@@ -876,31 +958,212 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
                 meta.innerText = 'Reproducido ' + (sound.playCount || 0) + ' veces' + (sound.retriggerable ? ' • Poly' : '');
                 textContainer.appendChild(meta);
 
-                // Description Box (Collapsible Operator instructions)
-                if (sound.instructions && sound.instructions.trim().length > 0) {
-                    const descBox = document.createElement('div');
-                    descBox.className = 'card-description-box';
-                    descBox.id = 'desc-box-' + sound.id;
-                    
-                    const descText = document.createElement('div');
-                    descText.className = 'description-text';
-                    descText.innerText = sound.instructions;
-                    descBox.appendChild(descText);
+                // Selected timeline panel (seek, -5s, +5s)
+                const timelinePanel = document.createElement('div');
+                timelinePanel.className = 'selected-timeline-panel';
+                timelinePanel.id = 'timeline-panel-' + sound.id;
+                timelinePanel.style.display = 'none'; // hidden by default until selected
+                timelinePanel.style.padding = '8px';
+                timelinePanel.style.backgroundColor = 'rgba(0,0,0,0.4)';
+                timelinePanel.style.borderRadius = '8px';
+                timelinePanel.style.marginTop = '6px';
+                timelinePanel.style.alignItems = 'center';
+                timelinePanel.style.justifyContent = 'space-between';
+                timelinePanel.style.gap = '8px';
+                timelinePanel.style.border = '1px solid rgba(255,255,255,0.08)';
 
-                    const toggleBtn = document.createElement('div');
-                    toggleBtn.className = 'show-more-toggle';
-                    toggleBtn.innerText = 'Mostrar más';
-                    toggleBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        descBox.classList.toggle('is-expanded');
-                        toggleBtn.innerText = descBox.classList.contains('is-expanded') ? 'Mostrar menos' : 'Mostrar más';
+                const m5sBtn = document.createElement('button');
+                m5sBtn.className = 'yt-footer-btn';
+                m5sBtn.style.height = '24px';
+                m5sBtn.style.padding = '0 8px';
+                m5sBtn.style.fontSize = '0.7rem';
+                m5sBtn.innerText = '-5s';
+                m5sBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    seekRelative(sound.id, -5);
+                });
+
+                const seekRange = document.createElement('input');
+                seekRange.type = 'range';
+                seekRange.className = 'yt-slider';
+                seekRange.id = 'seek-range-' + sound.id;
+                seekRange.min = sound.startTime || 0;
+                seekRange.max = sound.endTime || 100;
+                seekRange.step = '0.1';
+                seekRange.value = sound.startTime || 0;
+                seekRange.addEventListener('input', (e) => {
+                    seekTo(sound.id, parseFloat(e.target.value));
+                });
+                seekRange.addEventListener('click', e => e.stopPropagation());
+
+                const p5sBtn = document.createElement('button');
+                p5sBtn.className = 'yt-footer-btn';
+                p5sBtn.style.height = '24px';
+                p5sBtn.style.padding = '0 8px';
+                p5sBtn.style.fontSize = '0.7rem';
+                p5sBtn.innerText = '+5s';
+                p5sBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    seekRelative(sound.id, 5);
+                });
+
+                timelinePanel.appendChild(m5sBtn);
+                timelinePanel.appendChild(seekRange);
+                timelinePanel.appendChild(p5sBtn);
+                
+                soundCard.appendChild(timelinePanel);
+
+                // Add card click listener to toggle selected state
+                soundCard.addEventListener('click', (e) => {
+                    if (e.target.closest('button, input, textarea, a, .yt-volume-slider-group, .yt-pill-button-group, .show-more-toggle, .desc-btn')) return;
+                    
+                    const isSelected = soundCard.classList.toggle('is-selected');
+                    const tl = document.getElementById('timeline-panel-' + sound.id);
+                    if (tl) {
+                        tl.style.display = isSelected ? 'flex' : 'none';
+                    }
+                });
+
+                // Description Box (Collapsible and Editable Operator instructions)
+                const descBox = document.createElement('div');
+                descBox.className = 'card-description-box';
+                descBox.id = 'desc-box-' + sound.id;
+                
+                const descHeader = document.createElement('div');
+                descHeader.style.display = 'flex';
+                descHeader.style.justifyContent = 'space-between';
+                descHeader.style.alignItems = 'center';
+                descHeader.style.marginBottom = '4px';
+                descHeader.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
+                descHeader.style.paddingBottom = '2px';
+
+                const descTitle = document.createElement('span');
+                descTitle.style.fontWeight = 'bold';
+                descTitle.style.color = '#f59e0b';
+                descTitle.style.fontSize = '0.75rem';
+                descTitle.innerText = '📖 INDICACIONES TEATRALES';
+                descHeader.appendChild(descTitle);
+
+                const editDescBtn = document.createElement('button');
+                editDescBtn.className = 'desc-btn';
+                editDescBtn.innerText = 'Editar';
+                editDescBtn.style.padding = '2px 6px';
+                editDescBtn.style.fontSize = '0.65rem';
+                descHeader.appendChild(editDescBtn);
+                descBox.appendChild(descHeader);
+
+                const descText = document.createElement('div');
+                descText.className = 'description-text';
+                descText.innerText = sound.instructions || 'Sin indicaciones de operación.';
+                descBox.appendChild(descText);
+
+                const toggleBtn = document.createElement('div');
+                toggleBtn.className = 'show-more-toggle';
+                toggleBtn.innerText = 'Mostrar más';
+                toggleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    descBox.classList.toggle('is-expanded');
+                    toggleBtn.innerText = descBox.classList.contains('is-expanded') ? 'Mostrar menos' : 'Mostrar más';
+                });
+                descBox.appendChild(toggleBtn);
+                textContainer.appendChild(descBox);
+
+                // Setup edit handler
+                editDescBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (descBox.classList.contains('is-editing')) return;
+                    descBox.classList.add('is-editing');
+                    
+                    const currentText = sound.instructions || '';
+                    descText.style.display = 'none';
+                    toggleBtn.style.display = 'none';
+                    editDescBtn.style.display = 'none';
+                    
+                    const textarea = document.createElement('textarea');
+                    textarea.className = 'description-edit-area';
+                    textarea.value = currentText;
+                    textarea.addEventListener('click', ev => ev.stopPropagation());
+                    descBox.appendChild(textarea);
+                    
+                    const actionContainer = document.createElement('div');
+                    actionContainer.className = 'desc-edit-actions';
+                    
+                    const saveBtn = document.createElement('button');
+                    saveBtn.className = 'desc-btn desc-btn-save';
+                    saveBtn.innerText = 'Guardar';
+                    saveBtn.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        const newText = textarea.value;
+                        sound.instructions = newText;
+                        descText.innerText = newText || 'Sin indicaciones de operación.';
+                        
+                        // Persist in localStorage
+                        localStorage.setItem('yt-sound-instructions-' + BOARD_DATA.id + '-' + sound.id, newText);
+                        
+                        // Cleanup
+                        textarea.remove();
+                        actionContainer.remove();
+                        descText.style.display = 'block';
+                        toggleBtn.style.display = 'inline-block';
+                        editDescBtn.style.display = 'block';
+                        descBox.classList.remove('is-editing');
                     });
                     
-                    descBox.appendChild(toggleBtn);
-                    textContainer.appendChild(descBox);
-                }
+                    const cancelBtn = document.createElement('button');
+                    cancelBtn.className = 'desc-btn';
+                    cancelBtn.innerText = 'Cancelar';
+                    cancelBtn.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        textarea.remove();
+                        actionContainer.remove();
+                        descText.style.display = 'block';
+                        toggleBtn.style.display = 'inline-block';
+                        editDescBtn.style.display = 'block';
+                        descBox.classList.remove('is-editing');
+                    });
+                    
+                    actionContainer.appendChild(cancelBtn);
+                    actionContainer.appendChild(saveBtn);
+                    descBox.appendChild(actionContainer);
+                });
 
-                // Controls row (Loop, Solo, Fade Out, Stop)
+                // Toggle Controls button bar
+                const cardButtonsBar = document.createElement('div');
+                cardButtonsBar.style.display = 'flex';
+                cardButtonsBar.style.gap = '8px';
+                cardButtonsBar.style.marginTop = '6px';
+                cardButtonsBar.style.marginBottom = '6px';
+
+                const toggleControlsBtn = document.createElement('button');
+                toggleControlsBtn.className = 'yt-footer-btn';
+                toggleControlsBtn.style.height = '28px';
+                toggleControlsBtn.style.padding = '0 10px';
+                toggleControlsBtn.style.fontSize = '0.75rem';
+                toggleControlsBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px; height:12px; margin-right:4px;"><path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg><span>Controles</span>';
+                
+                cardButtonsBar.appendChild(toggleControlsBtn);
+                textContainer.appendChild(cardButtonsBar);
+
+                // Controls row (Loop, Solo, Fade Out, Stop) inside a collapsible controlsPanel
+                const controlsPanel = document.createElement('div');
+                controlsPanel.className = 'card-controls-panel';
+                controlsPanel.id = 'controls-panel-' + sound.id;
+                controlsPanel.style.display = 'none'; // hidden by default
+                controlsPanel.style.flexDirection = 'column';
+                controlsPanel.style.gap = '8px';
+                controlsPanel.style.padding = '10px';
+                controlsPanel.style.backgroundColor = 'rgba(255,255,255,0.03)';
+                controlsPanel.style.borderRadius = '8px';
+                controlsPanel.style.marginTop = '8px';
+                controlsPanel.style.border = '1px solid rgba(255,255,255,0.06)';
+
+                toggleControlsBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isVisible = controlsPanel.style.display === 'flex';
+                    controlsPanel.style.display = isVisible ? 'none' : 'flex';
+                    toggleControlsBtn.classList.toggle('is-active', !isVisible);
+                });
+
                 const actionsBar = document.createElement('div');
                 actionsBar.className = 'card-actions-bar';
 
@@ -1074,7 +1337,8 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
                 panGroup.appendChild(panSlider);
                 actionsBar.appendChild(panGroup);
 
-                textContainer.appendChild(actionsBar);
+                controlsPanel.appendChild(actionsBar);
+                textContainer.appendChild(controlsPanel);
                 cardDetails.appendChild(textContainer);
                 soundCard.appendChild(cardDetails);
 
@@ -1084,6 +1348,10 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
                 getDecodedBuffer(sound.audioSourceId).then(buffer => {
                     const dur = (sound.endTime || buffer.duration) - sound.startTime;
                     durationBadge.innerText = formatTime(dur);
+                    const rangeEl = document.getElementById('seek-range-' + sound.id);
+                    if (rangeEl) {
+                        rangeEl.max = sound.endTime || buffer.duration;
+                    }
                 }).catch(err => {
                     console.error("Error cargando sonido", err);
                     durationBadge.innerText = 'ERROR';
@@ -1230,6 +1498,9 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
                     const durationBadge = document.getElementById('duration-' + sound.id);
                     if (durationBadge) durationBadge.innerText = formatTime(Math.min(curTime, soundEndTime)) + ' / ' + formatTime(durationToPlay);
 
+                    const seekRangeEl = document.getElementById('seek-range-' + sound.id);
+                    if (seekRangeEl) seekRangeEl.value = Math.min(curTime, soundEndTime);
+
                     obj.animationFrameId = requestAnimationFrame(updateProgress);
                 }
                 updateProgress();
@@ -1337,6 +1608,9 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
                         card.classList.add('is-paused');
                     }
                 }
+                
+                const rangeEl = document.getElementById('seek-range-' + soundId);
+                if (rangeEl) rangeEl.value = clamped;
             });
         }
 
@@ -1464,6 +1738,55 @@ export const generateYoutubeProductionHTML = (board: Soundboard, audioData: { [k
         // Search filter
         searchInput.addEventListener('input', (e) => {
             renderSounds(e.target.value);
+        });
+
+        // Download modified copy
+        document.getElementById('download-updated-btn').addEventListener('click', () => {
+            const safeBtoa = (str) => {
+                return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode(parseInt(p1, 16))));
+            };
+            const newEncoded = safeBtoa(JSON.stringify(BOARD_DATA));
+            
+            const currentMasterVolume = parseFloat(document.getElementById('master-volume').value);
+            
+            fetch(window.location.href)
+                .then(r => r.text())
+                .then(originalHtml => {
+                    const boardRegex = /board:\s*JSON\.parse\(\s*(?:safeAtob|atob)\s*\(\s*"([^"]+)"\s*\)\s*\)/;
+                    let updatedHtml = originalHtml.replace(boardRegex, 'board: JSON.parse(safeAtob("' + newEncoded + '"))');
+                    
+                    const masterVolumeRegex = /initialMasterVolume:\s*[0-9.]+/;
+                    updatedHtml = updatedHtml.replace(masterVolumeRegex, 'initialMasterVolume: ' + currentMasterVolume);
+
+                    const blob = new Blob([updatedHtml], { type: 'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'SoundTube_' + BOARD_DATA.name.replace(/[^a-z0-9]/gi, '_') + '.html';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                })
+                .catch(err => {
+                    console.warn("Could not fetch local source, using outerHTML fallback", err);
+                    const outer = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+                    const boardRegex = /board:\s*JSON\.parse\(\s*(?:safeAtob|atob)\s*\(\s*"([^"]+)"\s*\)\s*\)/;
+                    let updatedHtml = outer.replace(boardRegex, 'board: JSON.parse(safeAtob("' + newEncoded + '"))');
+                    
+                    const masterVolumeRegex = /initialMasterVolume:\s*[0-9.]+/;
+                    updatedHtml = updatedHtml.replace(masterVolumeRegex, 'initialMasterVolume: ' + currentMasterVolume);
+
+                    const blob = new Blob([updatedHtml], { type: 'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'SoundTube_' + BOARD_DATA.name.replace(/[^a-z0-9]/gi, '_') + '.html';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                });
         });
 
         // Initial render

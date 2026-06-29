@@ -918,6 +918,11 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M15.97 2.47a.75.75 0 011.06 0l2.25 2.25a.75.75 0 010 1.06l-2.25 2.25a.75.75 0 11-1.06-1.06l.97-.97H12.75a.75.75 0 010-1.5h4.19l-.97-.97a.75.75 0 010-1.06zm-7.94 0a.75.75 0 010 1.06l-.97.97h4.19a.75.75 0 010 1.5H7.06l.97.97a.75.75 0 01-1.06 1.06l-2.25-2.25a.75.75 0 010-1.06l2.25-2.25a.75.75 0 011.06 0zm13.5 13.5a.75.75 0 010 1.06l-2.25 2.25a.75.75 0 01-1.06 0l-2.25-2.25a.75.75 0 111.06-1.06l.97-.97v-4.19a.75.75 0 011.5 0v4.19l.97-.97a.75.75 0 011.06 0zm-13.5 0a.75.75 0 011.06 0l.97.97v-4.19a.75.75 0 011.5 0v4.19l.97-.97a.75.75 0 111.06 1.06l-2.25 2.25a.75.75 0 01-1.06 0l-2.25-2.25a.75.75 0 010-1.06z" clip-rule="evenodd" /></svg>
             </button>
             <div style="width: 1px; height: 24px; background: var(--border-color); margin: 0 8px;"></div>
+            <button id="download-updated-btn" class="rearrange-btn" style="background-color: var(--card-bg); color: white; display: flex; align-items: center; justify-content: center; gap: 4px; border: 1px solid var(--border-color); padding: 4px 8px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 11px;" title="Descargar Copia Modificada">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                <span>Descargar Copia</span>
+            </button>
+            <div style="width: 1px; height: 24px; background: var(--border-color); margin: 0 8px;"></div>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M3 3a1 1 0 00-1 1v8a1 1 0 001 1h10a1 1 0 001-1V4a1 1 0 00-1-1H3zm12 11H1V2h14v12z"/></svg>
             <input type="range" class="resize-slider" min="120" max="480" value="220" title="Tamaño de los pads">
         </div>
@@ -1077,6 +1082,56 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                     rearrangeBtn.classList.toggle('active', this.state.isRearrangeMode);
                     document.getElementById('sound-grid').classList.toggle('rearrange-mode', this.state.isRearrangeMode);
                 });
+
+                const downloadBtn = document.getElementById('download-updated-btn');
+                if (downloadBtn) {
+                    downloadBtn.addEventListener('click', () => {
+                        const safeBtoa = (str: string) => {
+                            return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode(parseInt(p1, 16))));
+                        };
+                        const newEncoded = safeBtoa(JSON.stringify(this.config.board));
+                        const currentMasterVolume = parseFloat((document.getElementById('master-volume') as HTMLInputElement).value);
+                        
+                        fetch(window.location.href)
+                            .then(r => r.text())
+                            .then(originalHtml => {
+                                const boardRegex = /board:\s*JSON\.parse\(\s*(?:safeAtob|atob)\s*\(\s*"([^"]+)"\s*\)\s*\)/;
+                                let updatedHtml = originalHtml.replace(boardRegex, 'board: JSON.parse(safeAtob("' + newEncoded + '"))');
+                                
+                                const masterVolumeRegex = /initialMasterVolume:\s*[0-9.]+/;
+                                updatedHtml = updatedHtml.replace(masterVolumeRegex, 'initialMasterVolume: ' + currentMasterVolume);
+
+                                const blob = new Blob([updatedHtml], { type: 'text/html' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = 'Soundboard_' + this.config.board.name.replace(/[^a-z0-9]/gi, '_') + '.html';
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(url);
+                            })
+                            .catch(err => {
+                                console.warn("Could not fetch local source, using outerHTML fallback", err);
+                                const outer = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+                                const boardRegex = /board:\s*JSON\.parse\(\s*(?:safeAtob|atob)\s*\(\s*"([^"]+)"\s*\)\s*\)/;
+                                let updatedHtml = outer.replace(boardRegex, 'board: JSON.parse(safeAtob("' + newEncoded + '"))');
+                                
+                                const masterVolumeRegex = /initialMasterVolume:\s*[0-9.]+/;
+                                updatedHtml = updatedHtml.replace(masterVolumeRegex, 'initialMasterVolume: ' + currentMasterVolume);
+
+                                const blob = new Blob([updatedHtml], { type: 'text/html' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = 'Soundboard_' + this.config.board.name.replace(/[^a-z0-9]/gi, '_') + '.html';
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(url);
+                            });
+                    });
+                }
 
                 const showArchivedBtn = document.getElementById('show-archived-btn');
                 if (showArchivedBtn) {
@@ -1502,14 +1557,21 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                     /* Archived badge overlay */
                     const archivedOverlay = sound.hidden ? '<div class="archived-badge"><span>Archivado</span></div>' : '';
 
-                    /* Operator instructions trigger (bulb icon) */
-                    const instructionsButton = (sound.instructions && sound.instructions.trim().length > 0) ? 
-                        '<div style="position: absolute; top: 6px; right: 6px; z-index: 35;">' +
-                            '<button class="instruction-btn" title="Ver guía del operador">' +
+                    /* Operator instructions trigger (bulb icon) always visible for editing */
+                    const instructionsButton = 
+                        '<div style="position: absolute; top: 6px; right: 6px; z-index: 35;" class="instruction-container">' +
+                            '<button class="instruction-btn" title="Instrucciones del operador" style="' + 
+                            ((sound.instructions && sound.instructions.trim().length > 0) ? '' : 'opacity: 0.4;') + '">' +
                                 this.config.icons.bulb +
                             '</button>' +
-                            '<div class="instruction-tooltip">' + sound.instructions + '</div>' +
-                        '</div>' : '';
+                            '<div class="instruction-tooltip">' +
+                                '<div class="tooltip-header" style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:4px; padding-bottom:2px; font-weight:bold; font-size:10px;">' +
+                                    '<span style="color:#f59e0b;">📖 GUÍA:</span>' +
+                                    '<button class="tooltip-edit-btn" style="background:rgba(255,255,255,0.15); border:none; color:white; border-radius:3px; padding:1px 4px; font-size:9px; cursor:pointer;">Editar</button>' +
+                                '</div>' +
+                                '<div class="tooltip-body-text" style="font-size:11px; font-family:sans-serif; white-space:pre-wrap; line-height:1.3; color:#fef3c7;">' + (sound.instructions || 'Sin indicaciones.') + '</div>' +
+                            '</div>' +
+                        '</div>';
 
                     /* Define what to render in actions row depending on size */
                     let actionsRowContent = '';
@@ -1553,6 +1615,11 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                                 })() : '') +
                             '</div>' +
                             '<div class="pad-body"><div class="play-icon">' + (playingNode && playingNode.status === 'playing' ? this.config.icons.pause : this.config.icons.play) + '</div></div>' +
+                            '<div class="selected-timeline-panel" id="timeline-panel-' + sound.id + '" style="display: none; align-items: center; gap: 4px; padding: 4px; background: rgba(0,0,0,0.5); border-radius: 4px; margin-top: 4px; width: 100%;">' +
+                                '<button class="skip-btn" data-dir="-1" style="background: rgba(255,255,255,0.1); border: none; color: white; border-radius: 4px; padding: 2px 6px; font-size: 9px; cursor: pointer; font-weight: bold;">-5s</button>' +
+                                '<input type="range" class="timeline-range" id="seek-range-' + sound.id + '" min="' + (sound.startTime || 0) + '" max="' + duration + '" step="0.1" value="' + (sound.startTime || 0) + '" style="flex-grow: 1; height: 3px; cursor: pointer;">' +
+                                '<button class="skip-btn" data-dir="1" style="background: rgba(255,255,255,0.1); border: none; color: white; border-radius: 4px; padding: 2px 6px; font-size: 9px; cursor: pointer; font-weight: bold;">+5s</button>' +
+                            '</div>' +
                             '<div class="pad-footer">' +
                                 '<div class="pad-actions-row">' +
                                     actionsRowContent +
@@ -1578,10 +1645,38 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                     const quickControlsBtn = pad.querySelector('.quick-controls-btn');
                     const instructionBtn = pad.querySelector('.instruction-btn');
                     const tooltip = pad.querySelector('.instruction-tooltip');
+                    const timelineRange = pad.querySelector('.timeline-range');
+                    const skipBtns = pad.querySelectorAll('.skip-btn');
 
                     pad.addEventListener("click", e => {
-                        if(e.target.closest('button') || e.target.closest('input')) return;
-                        this.audio.togglePlay(sound);
+                        if (e.target.closest('button') || e.target.closest('input') || e.target.closest('.selected-timeline-panel') || e.target.closest('.instruction-container')) return;
+                        
+                        document.querySelectorAll('.sound-pad').forEach(p => {
+                            if (p !== pad) {
+                                p.classList.remove('is-selected');
+                                const tl = p.querySelector('.selected-timeline-panel');
+                                if (tl) tl.style.display = 'none';
+                            }
+                        });
+
+                        const isSelected = pad.classList.toggle('is-selected');
+                        const tlPanel = pad.querySelector('.selected-timeline-panel');
+                        if (tlPanel) tlPanel.style.display = isSelected ? 'flex' : 'none';
+                    });
+                    
+                    if (timelineRange) {
+                        timelineRange.addEventListener('input', e => {
+                            this.audio.seekTo(sound.id, parseFloat(e.target.value));
+                        });
+                        timelineRange.addEventListener('click', e => e.stopPropagation());
+                    }
+                    
+                    skipBtns.forEach(btn => {
+                        btn.addEventListener('click', e => {
+                            e.stopPropagation();
+                            const dir = parseInt(btn.getAttribute('data-dir'));
+                            this.audio.seekRelative(sound.id, dir * 5);
+                        });
                     });
                     
                     if (fadeBtn) fadeBtn.addEventListener("click", e => { e.stopPropagation(); this.audio.toggleFade(sound.id); });
@@ -1626,6 +1721,94 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                             tooltip.classList.toggle('visible');
                         });
                         tooltip.addEventListener("click", e => e.stopPropagation());
+                        
+                        const editBtn = tooltip.querySelector('.tooltip-edit-btn');
+                        const bodyText = tooltip.querySelector('.tooltip-body-text');
+                        
+                        if (editBtn && bodyText) {
+                            editBtn.addEventListener('click', e => {
+                                e.stopPropagation();
+                                if (tooltip.classList.contains('is-editing')) return;
+                                tooltip.classList.add('is-editing');
+                                
+                                const oldText = sound.instructions || '';
+                                bodyText.innerHTML = '';
+                                editBtn.style.display = 'none';
+                                
+                                const textarea = document.createElement('textarea');
+                                textarea.style.width = '100%';
+                                textarea.style.height = '60px';
+                                textarea.style.background = '#111827';
+                                textarea.style.color = 'white';
+                                textarea.style.border = '1px solid #4b5563';
+                                textarea.style.fontSize = '11px';
+                                textarea.style.padding = '4px';
+                                textarea.value = oldText;
+                                textarea.addEventListener('click', ev => ev.stopPropagation());
+                                bodyText.appendChild(textarea);
+                                
+                                const actions = document.createElement('div');
+                                actions.style.display = 'flex';
+                                actions.style.justifyContent = 'flex-end';
+                                actions.style.gap = '4px';
+                                actions.style.marginTop = '4px';
+                                
+                                const saveBtn = document.createElement('button');
+                                saveBtn.innerText = 'Ok';
+                                saveBtn.style.background = '#ef4444';
+                                saveBtn.style.border = 'none';
+                                saveBtn.style.color = 'white';
+                                saveBtn.style.fontSize = '9px';
+                                saveBtn.style.padding = '2px 6px';
+                                saveBtn.style.borderRadius = '3px';
+                                saveBtn.style.cursor = 'pointer';
+                                saveBtn.addEventListener('click', ev => {
+                                    ev.stopPropagation();
+                                    const val = textarea.value;
+                                    sound.instructions = val;
+                                    
+                                    // Save to localStorage
+                                    localStorage.setItem('advanced-sound-instructions-' + app.config.board.id + '-' + sound.id, val);
+                                    
+                                    bodyText.innerHTML = val || 'Sin indicaciones.';
+                                    editBtn.style.display = 'inline-block';
+                                    tooltip.classList.remove('is-editing');
+                                    
+                                    // Also update quick controls description if open
+                                    const qInst = document.getElementById('quick-instructions');
+                                    if (qInst && app.state.activeQuickSoundId === sound.id) {
+                                        qInst.textContent = val || 'Sin indicaciones cargadas.';
+                                    }
+                                    
+                                    // Update bulb opacity
+                                    if (val && val.trim().length > 0) {
+                                        instructionBtn.style.opacity = '1';
+                                    } else {
+                                        instructionBtn.style.opacity = '0.4';
+                                    }
+                                });
+                                
+                                const cancelBtn = document.createElement('button');
+                                cancelBtn.innerText = 'No';
+                                cancelBtn.style.background = '#374151';
+                                cancelBtn.style.border = 'none';
+                                cancelBtn.style.color = 'white';
+                                cancelBtn.style.fontSize = '9px';
+                                cancelBtn.style.padding = '2px 6px';
+                                cancelBtn.style.borderRadius = '3px';
+                                cancelBtn.style.cursor = 'pointer';
+                                cancelBtn.addEventListener('click', ev => {
+                                    ev.stopPropagation();
+                                    bodyText.innerHTML = oldText || 'Sin indicaciones.';
+                                    editBtn.style.display = 'inline-block';
+                                    tooltip.classList.remove('is-editing');
+                                });
+                                
+                                actions.appendChild(cancelBtn);
+                                actions.appendChild(saveBtn);
+                                bodyText.appendChild(actions);
+                            });
+                        }
                     }
 
                     this.state.domCache[sound.id] = { pad, playIcon, fadeBtn, volumeSlider,
@@ -1660,8 +1843,11 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                         const relativeCurrentTime = current - sound.startTime;
                         
                         if (currentTime) currentTime.textContent = this.util.formatTime(relativeCurrentTime);
-                        if (progress) progress.style.width = duration > 0 ? \`\\\${Math.min(100, (relativeCurrentTime / duration) * 100)}%\` : "0%";
+                        if (progress) progress.style.width = duration > 0 ? (Math.min(100, (relativeCurrentTime / duration) * 100)) + "%" : "0%";
                         
+                        const seekRangeEl = document.getElementById('seek-range-' + id);
+                        if (seekRangeEl) seekRangeEl.value = current;
+
                         if (node.analyser && glow) {
                             const data = new Uint8Array(node.analyser.frequencyBinCount);
                             node.analyser.getByteTimeDomainData(data);
@@ -1943,7 +2129,64 @@ export const generateProductionHTML = (board: Soundboard, audioData: { [key: str
                     if (app.state.activeQuickSoundId === soundId) {
                         app.updateQuickTransportUI(soundId);
                     }
-                }
+                },
+                seekTo(soundId: string, newTime: number) {
+                    const sound = app.config.board.sounds.find(s => s.id === soundId);
+                    if (!sound) return;
+                    
+                    const buffer = app.state.audioBuffers[sound.audioSourceId];
+                    if (!(buffer instanceof AudioBuffer)) return;
+                    
+                    const soundStartTime = sound.startTime || 0;
+                    const soundEndTime = sound.endTime || buffer.duration;
+                    const clamped = Math.max(soundStartTime, Math.min(newTime, soundEndTime));
+                    
+                    const node = app.state.playingNodes[soundId];
+                    const wasPlaying = node && node.status === 'playing';
+                    
+                    if (wasPlaying) {
+                        app.audio._hardStop(soundId);
+                        app.audio.play(sound, clamped);
+                    } else {
+                        const pct = (clamped / soundEndTime) * 100;
+                        const {pad, progress, currentTime} = app.state.domCache[soundId];
+                        if (progress) progress.style.width = pct + '%';
+                        if (currentTime) currentTime.textContent = app.util.formatTime(clamped) + ' / ' + app.util.formatTime(soundEndTime - soundStartTime);
+                        
+                        app.state.playingNodes[soundId] = {
+                            status: "paused",
+                            progress: clamped,
+                            source: null,
+                            gainNode: null
+                        } as any;
+                        if (pad) {
+                            pad.classList.remove('is-playing');
+                            pad.classList.add('is-paused');
+                        }
+                    }
+                    const rangeEl = document.getElementById('seek-range-' + soundId) as HTMLInputElement;
+                    if (rangeEl) rangeEl.value = String(clamped);
+                },
+                seekRelative(soundId: string, seconds: number) {
+                    const node = app.state.playingNodes[soundId];
+                    const sound = app.config.board.sounds.find(s => s.id === soundId);
+                    if (!sound) return;
+                    
+                    const buffer = app.state.audioBuffers[sound.audioSourceId];
+                    if (!(buffer instanceof AudioBuffer)) return;
+                    
+                    const soundStartTime = sound.startTime || 0;
+                    const soundEndTime = sound.endTime || buffer.duration;
+                    
+                    let currentOffset = soundStartTime;
+                    if (node) {
+                        currentOffset = node.progress;
+                        if (node.status === 'playing' && app.state.audioContext) {
+                            currentOffset += (app.state.audioContext.currentTime - node.contextStartTime) * (sound.pitch ?? 1.0);
+                        }
+                    }
+                    app.audio.seekTo(soundId, currentOffset + seconds);
+                },
             },
             eq: {
                 init() {

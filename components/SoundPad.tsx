@@ -43,6 +43,50 @@ const SoundPad = React.memo(({ sound, playbackState, isSolo, isDimmed, onPlay, o
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
     const [showControlsModal, setShowControlsModal] = useState(false);
     const [showInstructionsTooltip, setShowInstructionsTooltip] = useState(false);
+    const [isSelected, setIsSelected] = useState(false);
+    const [isEditingInstructions, setIsEditingInstructions] = useState(false);
+    const [instructionText, setInstructionText] = useState(sound.instructions || '');
+
+    useEffect(() => {
+        setInstructionText(sound.instructions || '');
+    }, [sound.instructions]);
+
+    const handleSeek = (newTime: number) => {
+        if (!(buffer instanceof AudioBuffer)) return;
+        const soundStartTime = sound.startTime ?? 0;
+        const soundEndTime = sound.endTime ?? buffer.duration;
+        const clamped = Math.max(soundStartTime, Math.min(newTime, soundEndTime));
+        
+        const wasPlaying = playbackState?.status === 'playing';
+        
+        if (wasPlaying) {
+            onStop(sound.id);
+            dispatch({ type: 'PAUSE_SOUND', payload: { soundId: sound.id, progress: clamped } });
+            setTimeout(() => {
+                onPlay(sound);
+            }, 50);
+        } else {
+            dispatch({ type: 'PAUSE_SOUND', payload: { soundId: sound.id, progress: clamped } });
+        }
+    };
+
+    const handleSkip = (seconds: number) => {
+        if (!(buffer instanceof AudioBuffer)) return;
+        const soundStartTime = sound.startTime ?? 0;
+        const soundEndTime = sound.endTime ?? buffer.duration;
+        let currentOffset = soundStartTime;
+        
+        if (playbackState) {
+            currentOffset = playbackState.progress;
+            if (playbackState.status === 'playing') {
+                const elapsed = (getAudioContext().currentTime - playbackState.contextStartTime) * (sound.pitch ?? 1.0);
+                currentOffset += elapsed;
+            }
+        }
+        
+        handleSeek(currentOffset + seconds);
+    };
+
     const animationFrameRef = useRef<number | null>(null);
     const glowRef = useRef<HTMLDivElement>(null);
 
@@ -294,71 +338,41 @@ const SoundPad = React.memo(({ sound, playbackState, isSolo, isDimmed, onPlay, o
     };
 
 
-    if (editMode) {
-        return (
-            <div
-                className={`relative z-10 touch-manipulation select-none rounded-lg flex flex-col h-full shadow-lg overflow-hidden ${padColorClass} border-2 border-transparent group transition-all ${sound.hidden ? 'opacity-60 bg-opacity-75' : ''}`}
-            >
-                {sound.hidden && (
-                    <div className="absolute top-2 right-2 z-35 flex items-center justify-center">
-                        <span className="text-[9px] uppercase font-black tracking-widest bg-amber-600 border border-amber-500/30 text-white px-2 py-0.5 rounded shadow">Archivado</span>
-                    </div>
-                )}
-                {imageUrl && typeof imageUrl === 'string' && imageUrl.startsWith('blob:') && (
-                    <>
-                        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${imageUrl})` }}></div>
-                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm group-hover:bg-black/50 transition-colors"></div>
-                    </>
-                )}
-                 <div className="absolute inset-0 bg-black/40 group-hover:bg-black/30 transition-colors"></div>
-
-                <div className="relative z-10 p-2 flex flex-col justify-between h-full">
-                    <h3 className={`font-bold text-sm break-words truncate-multiline text-left text-shadow-strong ${textColor}`} title={sound.name}>{sound.name}</h3>
-                    
-                    <div className="flex items-center justify-center gap-2 my-2 w-full px-1">
-                         {isDownloading ? <div className="spinner w-10 h-10"></div> : (isConfirmingDelete ? (
-                            <div className="bg-red-950/90 border border-red-500/40 rounded-lg p-1.5 flex flex-col items-center gap-1.5 w-full animate-fade-in">
-                                <span className="text-[10px] font-extrabold text-red-300">¿Borrar sonido?</span>
-                                <div className="flex gap-2 w-full justify-center">
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); handleDelete(e); }} 
-                                        className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white font-extrabold text-[9px] rounded shadow transition-colors cursor-pointer"
-                                    >
-                                        Sí
-                                    </button>
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); setIsConfirmingDelete(false); }} 
-                                        className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-extrabold text-[9px] rounded shadow transition-colors cursor-pointer"
-                                    >
-                                        No
-                                    </button>
-                                </div>
-                            </div>
-                         ) : (
-                            <>
-                                <button onClick={handleDownload} title="Descargar Sonido (Renderizado)" className="pad-action-btn h-14 w-14 hover:bg-blue-500/50">
-                                    <DownloadIcon className="h-7 w-7"/>
-                                </button>
-                                <button onClick={() => onEdit(sound)} title="Editar Sonido" className="pad-action-btn h-16 w-16 bg-black/40 hover:bg-indigo-500/50 block-drag">
-                                    <EditIcon className="h-8 w-8"/>
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); setIsConfirmingDelete(true); }} title="Borrar Sonido" className="pad-action-btn h-14 w-14 hover:bg-red-500/50 text-red-400">
-                                    <TrashIcon className="h-7 w-7" />
-                                </button>
-                            </>
-                         ))}
-                    </div>
-                     {/* Play count in edit mode too */}
-                    <div className="absolute bottom-2 right-2 text-xs font-mono opacity-70" style={{ color: secondaryTextColor }}>
-                        #{sound.playCount || 0}
+    return (
+        <div 
+            onClick={(e) => {
+                if (isRearrangeMode) return;
+                const target = e.target as HTMLElement;
+                if (target.closest('button, input, textarea, a, .block-drag')) return;
+                setIsSelected(!isSelected);
+            }}
+            className={`relative z-10 touch-manipulation select-none rounded-lg flex flex-col h-full shadow-lg transition-all duration-200 ease-in-out overflow-hidden ${padColorClass} border-2 ${
+                editMode 
+                ? 'border-dashed border-amber-500/50 hover:border-amber-400' 
+                : (isPlaying ? borderColorClass : (isSelected ? 'border-indigo-400 ring-2 ring-indigo-400/40 scale-[1.01]' : 'border-transparent'))
+            } ${isError ? 'border-red-500' : ''} ${!isLoaded && !isLoading ? 'opacity-50' : ''} ${sound.hidden ? 'bg-opacity-75' : ''}`} 
+            onMouseDown={() => !isRearrangeMode && getAudioContext()?.resume()}
+        >
+            {isConfirmingDelete && (
+                <div className="absolute inset-0 z-50 bg-red-950/90 backdrop-blur-sm flex flex-col items-center justify-center p-3 text-center animate-fade-in block-drag" onClick={e => e.stopPropagation()}>
+                    <span className="text-xs font-bold text-red-200 mb-2">¿Eliminar "{sound.name}"?</span>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); handleDelete(e); }} 
+                            className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded shadow transition-all duration-150 active:scale-95 cursor-pointer"
+                        >
+                            Confirmar
+                        </button>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setIsConfirmingDelete(false); }} 
+                            className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-xs rounded shadow transition-all duration-150 active:scale-95 cursor-pointer"
+                        >
+                            Cancelar
+                        </button>
                     </div>
                 </div>
-            </div>
-        );
-    }
+            )}
 
-    return (
-        <div className={`relative z-10 touch-manipulation select-none rounded-lg flex flex-col h-full shadow-lg transition-all duration-200 ease-in-out overflow-hidden ${padColorClass} border-2 ${isPlaying ? borderColorClass : 'border-transparent'} ${isError ? 'border-red-500' : ''} ${!isLoaded && !isLoading ? 'opacity-50' : ''} ${sound.hidden ? 'bg-opacity-75' : ''}`} onMouseDown={() => !isRearrangeMode && getAudioContext()?.resume()}>
             {sound.hidden && (
                 <div className="absolute inset-0 bg-gray-950/65 backdrop-blur-[1px] pointer-events-none z-25 flex items-center justify-center">
                     <span className="text-[10px] uppercase font-black tracking-widest bg-amber-600/90 text-white px-2 py-0.5 rounded shadow border border-amber-500/40">Archivado</span>
@@ -394,27 +408,59 @@ const SoundPad = React.memo(({ sound, playbackState, isSolo, isDimmed, onPlay, o
             )}
 
             <div className={`sound-pad-content flex flex-col justify-between h-full flex-grow min-h-0 ${isCompact ? 'p-1' : 'p-2'}`}>
-                <div className={`pad-action-group flex items-center justify-between gap-1 w-full z-30 ${isCompact ? 'scale-90 origin-top' : ''}`}>
-                    {!isUltraCompact ? (
-                        <>
-                            <button onClick={handleLoopToggle} disabled={isRearrangeMode} className={`pad-action-btn ${sound.loop ? 'active-loop' : ''}`} title="Loop">
-                                <LoopIcon className={isCompact ? "w-4 h-4" : "w-5 h-5"} />
+                <div className={`flex items-center justify-between gap-1.5 w-full z-30 ${isCompact ? 'scale-90 origin-top' : ''}`}>
+                    {editMode ? (
+                        <div className="flex items-center gap-1.5 w-full">
+                            {/* Download Button */}
+                            <button 
+                                onClick={handleDownload} 
+                                title="Descargar Sonido (Renderizado)" 
+                                className="h-8 w-8 bg-black/30 hover:bg-blue-600/40 text-blue-200 border border-blue-500/20 flex items-center justify-center rounded-full transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+                            >
+                                {isDownloading ? <div className="spinner w-4 h-4"></div> : <DownloadIcon className="h-4 w-4" />}
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); dispatch({ type: 'TOGGLE_SOLO', payload: sound.id }); }} disabled={isRearrangeMode} className={`pad-action-btn ${isSolo ? 'active-solo' : ''}`} title="Solo">
-                                <SoloIcon className={isCompact ? "w-4 h-4" : "w-5 h-5"} />
+                            
+                            {/* Edit Button */}
+                            <button 
+                                onClick={() => onEdit(sound)} 
+                                title="Editar Configuración" 
+                                className="flex-grow h-8 bg-black/40 hover:bg-indigo-600/40 text-indigo-200 border border-indigo-500/20 flex items-center justify-center gap-1 rounded-full transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] block-drag cursor-pointer shadow-sm"
+                            >
+                                <EditIcon className="h-4 w-4" />
+                                {!isCompact && <span className="text-[10px] font-bold">Editar</span>}
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); onFadeOut(sound.id); }} disabled={!playbackState || isRearrangeMode} className={`pad-action-btn ${isFadingOut ? 'active-fade' : ''}`} title={isFadingOut ? "Restaurar Volumen" : "Desvanecer"}>
-                                <FadeOutIcon className={isCompact ? "w-4 h-4" : "w-5 h-5"} />
+                            
+                            {/* Delete Button */}
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); setIsConfirmingDelete(true); }} 
+                                title="Borrar Ficha" 
+                                className="h-8 w-8 bg-black/30 hover:bg-red-600/40 text-red-300 border border-red-500/20 flex items-center justify-center rounded-full transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+                            >
+                                <TrashIcon className="h-4 w-4" />
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); onStop(sound.id); }} disabled={!playbackState || isRearrangeMode} className="pad-action-btn" title="Detener">
-                                <StopIcon className={isCompact ? "w-4 h-4" : "w-5 h-5"} />
-                            </button>
-                        </>
+                        </div>
                     ) : (
-                        <button onClick={(e) => { e.stopPropagation(); onStop(sound.id); }} disabled={!playbackState || isRearrangeMode} className="pad-action-btn bg-black/20 hover:bg-red-900/30 p-1 rounded" title="Detener">
-                            <StopIcon className="w-4 h-4" />
-                        </button>
-                    )}
+                        <>
+                            {!isUltraCompact ? (
+                                <>
+                                    <button onClick={handleLoopToggle} disabled={isRearrangeMode} className={`pad-action-btn ${sound.loop ? 'active-loop' : ''}`} title="Loop">
+                                        <LoopIcon className={isCompact ? "w-4 h-4" : "w-5 h-5"} />
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); dispatch({ type: 'TOGGLE_SOLO', payload: sound.id }); }} disabled={isRearrangeMode} className={`pad-action-btn ${isSolo ? 'active-solo' : ''}`} title="Solo">
+                                        <SoloIcon className={isCompact ? "w-4 h-4" : "w-5 h-5"} />
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); onFadeOut(sound.id); }} disabled={!playbackState || isRearrangeMode} className={`pad-action-btn ${isFadingOut ? 'active-fade' : ''}`} title={isFadingOut ? "Restaurar Volumen" : "Desvanecer"}>
+                                        <FadeOutIcon className={isCompact ? "w-4 h-4" : "w-5 h-5"} />
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); onStop(sound.id); }} disabled={!playbackState || isRearrangeMode} className="pad-action-btn" title="Detener">
+                                        <StopIcon className={isCompact ? "w-4 h-4" : "w-5 h-5"} />
+                                    </button>
+                                </>
+                            ) : (
+                                <button onClick={(e) => { e.stopPropagation(); onStop(sound.id); }} disabled={!playbackState || isRearrangeMode} className="pad-action-btn bg-black/20 hover:bg-red-900/30 p-1 rounded" title="Detener">
+                                    <StopIcon className="w-4 h-4" />
+                                </button>
+                            )}
                     
                     {/* Controls modal trigger button */}
                     {isCompact && (
@@ -439,6 +485,8 @@ const SoundPad = React.memo(({ sound, playbackState, isSolo, isDimmed, onPlay, o
                             )}
                         </svg>
                     </button>
+                        </>
+                    )}
                 </div>
 
                 <div className="flex flex-col z-10 gap-0.5 text-left w-full mt-1">
@@ -446,29 +494,75 @@ const SoundPad = React.memo(({ sound, playbackState, isSolo, isDimmed, onPlay, o
                         <h3 className={`font-bold break-words truncate-multiline flex-grow text-shadow-strong leading-tight ${isCompact ? 'text-[11px]' : 'text-sm'} ${textColor}`} title={sound.name}>{sound.name}</h3>
                         
                         {/* Operator guidance indicator */}
-                        {sound.instructions && sound.instructions.trim().length > 0 && (
-                            <div className="relative flex-shrink-0">
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); setShowInstructionsTooltip(!showInstructionsTooltip); }}
-                                    className="p-0.5 bg-amber-500/20 hover:bg-amber-500/35 border border-amber-500/40 rounded text-amber-300 hover:text-amber-200 transition-all focus:outline-none cursor-pointer flex items-center justify-center"
-                                    title="Ver guía del operador"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                        <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.46 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" />
-                                    </svg>
-                                </button>
-                                
-                                {showInstructionsTooltip && (
-                                    <>
-                                        <div className="fixed inset-0 z-40 cursor-default" onClick={(e) => { e.stopPropagation(); setShowInstructionsTooltip(false); }} />
-                                        <div className="absolute right-0 bottom-6 w-56 p-2.5 bg-gray-950/95 border border-amber-500/40 rounded-lg shadow-xl text-[10px] text-amber-200 font-sans z-50 leading-relaxed max-h-36 overflow-y-auto whitespace-pre-wrap animate-fade-in" onClick={e => e.stopPropagation()}>
-                                            <div className="font-extrabold text-amber-400 mb-1 border-b border-amber-500/20 pb-0.5 text-[9px] tracking-wide">ℹ️ INSTRUCCIONES DEL OPERADOR:</div>
-                                            {sound.instructions}
+                        <div className="relative flex-shrink-0">
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); setShowInstructionsTooltip(!showInstructionsTooltip); }}
+                                className={`p-0.5 border rounded transition-all focus:outline-none cursor-pointer flex items-center justify-center ${
+                                    sound.instructions && sound.instructions.trim().length > 0 
+                                    ? 'bg-amber-500/20 hover:bg-amber-500/35 border-amber-500/40 text-amber-300 hover:text-amber-200' 
+                                    : 'bg-gray-800/40 hover:bg-gray-700/60 border-gray-700 text-gray-400 hover:text-gray-200'
+                                }`}
+                                title="Instrucciones del operador"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.46 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" />
+                                </svg>
+                            </button>
+                            
+                            {showInstructionsTooltip && (
+                                <>
+                                    <div className="fixed inset-0 z-40 cursor-default" onClick={(e) => { e.stopPropagation(); setShowInstructionsTooltip(false); setIsEditingInstructions(false); }} />
+                                    <div className="absolute right-0 bottom-6 w-60 p-2.5 bg-gray-950/95 border border-amber-500/40 rounded-lg shadow-xl text-[10px] text-amber-200 font-sans z-50 leading-relaxed max-h-48 overflow-y-auto block-drag" onClick={e => e.stopPropagation()}>
+                                        <div className="font-extrabold text-amber-400 mb-1 border-b border-amber-500/20 pb-0.5 text-[9px] tracking-wide flex justify-between items-center">
+                                            <span>ℹ️ GUÍA DEL OPERADOR:</span>
+                                            {!isEditingInstructions && (
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); setIsEditingInstructions(true); }}
+                                                    className="px-1 py-0.5 bg-amber-600 hover:bg-amber-500 text-white rounded text-[8px] font-bold"
+                                                >
+                                                    Editar
+                                                </button>
+                                            )}
                                         </div>
-                                    </>
-                                )}
-                            </div>
-                        )}
+                                        {isEditingInstructions ? (
+                                            <div className="flex flex-col gap-1.5 mt-1">
+                                                <textarea
+                                                    value={instructionText}
+                                                    onChange={(e) => setInstructionText(e.target.value)}
+                                                    className="w-full h-20 bg-gray-900 text-white border border-amber-500/30 rounded p-1 text-[10px] font-mono focus:outline-none focus:border-amber-500"
+                                                    placeholder="Escriba instrucciones..."
+                                                    onClick={e => e.stopPropagation()}
+                                                />
+                                                <div className="flex justify-end gap-1.5">
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            dispatch({ type: 'UPDATE_SOUND', payload: { soundId: sound.id, updates: { instructions: instructionText } } });
+                                                            setIsEditingInstructions(false);
+                                                        }}
+                                                        className="px-2 py-0.5 bg-green-600 hover:bg-green-500 text-white rounded text-[9px] font-bold"
+                                                    >
+                                                        Guardar
+                                                    </button>
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setIsEditingInstructions(false);
+                                                            setInstructionText(sound.instructions || '');
+                                                        }}
+                                                        className="px-2 py-0.5 bg-gray-800 hover:bg-gray-750 text-gray-300 rounded text-[9px] font-bold"
+                                                    >
+                                                        Cancelar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="whitespace-pre-wrap">{sound.instructions || 'Sin indicaciones.'}</div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                     {nextSoundName && !isCompact && (
                         <div className="flex items-center gap-1.5 text-[9px] font-bold bg-black/40 border border-white/10 px-2 py-0.5 rounded-full w-fit text-indigo-200 shadow-sm animate-fade-in" title={`Al finalizar: ${nextSoundName}`}>
@@ -490,6 +584,38 @@ const SoundPad = React.memo(({ sound, playbackState, isSolo, isDimmed, onPlay, o
                         {isLoading ? <div className={`spinner ${isCompact ? 'w-5 h-5' : 'w-8 h-8'}`}></div> : (isError ? <ErrorIcon className={isCompact ? "w-5 h-5 text-red-400" : "w-8 h-8 text-red-400"}/> : (isPlaying ? <PauseIcon className={`${isCompact ? 'w-5 h-5' : 'w-8 h-8'} ${textColor}`} /> : <PlayIcon className={`${isCompact ? 'w-5 h-5' : 'w-8 h-8'} ${textColor}`} />))}
                     </button>
                 </div>
+                
+                {isSelected && isLoaded && !isRetriggerable && (
+                    <div className="w-full flex flex-col gap-1 z-30 mt-0.5 mb-1 bg-black/40 p-1.5 rounded border border-white/10 animate-fade-in block-drag">
+                        <div className="flex items-center justify-between gap-1">
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleSkip(-5); }}
+                                className="px-1.5 py-0.5 bg-gray-800 hover:bg-gray-750 text-white rounded text-[9px] font-extrabold hover:text-indigo-300 transition-colors cursor-pointer"
+                                title="Retroceder 5 segundos"
+                            >
+                                -5s
+                            </button>
+                            <input
+                                type="range"
+                                min={sound.startTime ?? 0}
+                                max={sound.endTime ?? (buffer instanceof AudioBuffer ? buffer.duration : 0)}
+                                step="0.1"
+                                value={currentTime + (sound.startTime ?? 0)}
+                                onChange={(e) => handleSeek(parseFloat(e.target.value))}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full accent-indigo-500 h-1 bg-gray-750 rounded-lg appearance-none cursor-pointer"
+                                title="Posición de reproducción"
+                            />
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleSkip(5); }}
+                                className="px-1.5 py-0.5 bg-gray-800 hover:bg-gray-750 text-white rounded text-[9px] font-extrabold hover:text-indigo-300 transition-colors cursor-pointer"
+                                title="Avanzar 5 segundos"
+                            >
+                                +5s
+                            </button>
+                        </div>
+                    </div>
+                )}
                 
                 {!isUltraCompact && (
                     <div className="z-10 text-[11px] flex-shrink-0 relative mt-0.5">
